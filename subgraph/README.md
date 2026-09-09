@@ -4,11 +4,11 @@ Indexes the offer book, the payout-credit lifecycle, and market parameter
 history.
 
 ```shell
-npm install
-npm run abi        # regenerate abis/XMRP2P.json from the Foundry build
-npm run codegen
-npm run build
-npm run deploy     # Subgraph Studio
+pnpm install
+pnpm run abi       # regenerate abis/XMRP2P.json from the Foundry build
+pnpm run codegen
+pnpm run build
+pnpm run deploy    # Subgraph Studio — use `run`, pnpm also has a builtin `deploy`
 ```
 
 `graph codegen` and `graph build` both pass. Nothing here has been run against a
@@ -60,8 +60,8 @@ on-chain, all six values decode correctly.
 Needs a deploy key, which this repo does not carry:
 
 ```shell
-npx graph auth <deploy-key>          # from thegraph.com/studio
-npx graph deploy <subgraph-slug>     # after creating the subgraph in Studio
+pnpm exec graph auth <deploy-key>        # from thegraph.com/studio
+pnpm exec graph deploy <subgraph-slug>   # after creating the subgraph in Studio
 ```
 
 The manifest, schema and mappings are ready — `graph build` passes against
