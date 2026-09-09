@@ -56,19 +56,13 @@ library Ed25519 {
         uint256 f = addmod(b, q - e, q);
         uint256 g = addmod(b, e, q);
         x3 = mulmod(
-            mulmod(a, f, q),
-            addmod(addmod(mulmod(addmod(x1, y1, q), addmod(x2, y2, q), q), q - c, q), q - dd, q),
-            q
+            mulmod(a, f, q), addmod(addmod(mulmod(addmod(x1, y1, q), addmod(x2, y2, q), q), q - c, q), q - dd, q), q
         );
         y3 = mulmod(mulmod(a, g, q), addmod(dd, c, q), q);
         z3 = mulmod(f, g, q);
     }
 
-    function ecDouble(uint256 x1, uint256 y1, uint256 z1)
-        internal
-        pure
-        returns (uint256 x2, uint256 y2, uint256 z2)
-    {
+    function ecDouble(uint256 x1, uint256 y1, uint256 z1) internal pure returns (uint256 x2, uint256 y2, uint256 z2) {
         uint256 a = addmod(x1, y1, q);
         uint256 b = mulmod(a, a, q);
         uint256 c = mulmod(x1, x1, q);
@@ -224,5 +218,21 @@ library Ed25519 {
     function compressPointLittleEndian(uint256 x, uint256 y) internal pure returns (uint256) {
         // In little-endian compressed Ed25519 encoding, the sign bit is bit 7 of byte 31.
         return changeEndianness(y) | ((x & 1) << 7);
+    }
+
+    error NonCanonicalPoint();
+
+    /// Reject compressed points this library could never produce.
+    ///
+    /// scalarMultBaseCompressed always yields y < q, so a commitment whose
+    /// y-coordinate is >= q can never be matched by any reveal. A party can
+    /// exploit that: commit a non-canonical encoding of a key it does control,
+    /// let the counterparty escrow real XMR against the derived address, then
+    /// be permanently unable to reveal on-chain. y = 0 and y = 1 are rejected
+    /// for the same reason — they are the identity and a small-order point,
+    /// neither of which is the image of a valid scalar.
+    function requireCanonicalPoint(uint256 compressed) internal pure {
+        uint256 y = changeEndianness(compressed & ~uint256(0x80));
+        if (y >= q || y <= 1) revert NonCanonicalPoint();
     }
 }
