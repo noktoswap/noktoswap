@@ -1,0 +1,50 @@
+specVersion: 1.0.0
+description: xmrp2p — atomic ETH/XMR swap offer book
+repository: https://github.com/v3xlabs/xmrp2p
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: XMRP2P
+    # TARGET DECISION — see README.md in this directory.
+    #
+    # This points at the upstream v1.1 deployment, which carries real offers but
+    # predates the Withdrawal / Recovered / PayoutCredited / ParametersUpdated
+    # events. Those handlers simply never fire against it; the offer book indexes
+    # fine. Repoint at the fixed contract once it is deployed.
+    network: mainnet
+    source:
+      address: "0xad6871d44804288ba4393464c63544d6691d76ba"
+      abi: XMRP2P
+      # TODO: deployment block of the address above — Etherscan, contract
+      # creation tx. Leaving this at 0 makes the initial sync take hours.
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mapping.ts
+      entities:
+        - Offer
+        - OfferTransition
+        - Account
+        - PayoutCredit
+        - AccountWithdrawal
+        - OwnerRecovery
+        - MarketParameters
+      abis:
+        - name: XMRP2P
+          file: ./abis/XMRP2P.json
+      eventHandlers:
+        - event: OfferEvent(indexed uint256,indexed uint8,indexed uint8)
+          handler: handleOfferEvent
+        - event: PayoutCredited(indexed address,uint256)
+          handler: handlePayoutCredited
+        - event: Withdrawal(indexed address,uint256)
+          handler: handleWithdrawal
+        - event: Recovered(indexed address,uint256)
+          handler: handleRecovered
+        - event: ParametersUpdated((uint256,uint256,uint256,uint256,uint256,uint256))
+          handler: handleParametersUpdated

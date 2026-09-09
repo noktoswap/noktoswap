@@ -1,0 +1,141 @@
+# xmrp2p subgraph schema
+#
+# PRIVACY — no Monero key material is indexed. See subgraph/README.md.
+#
+# Every key in the Offer struct is already public on-chain, but a subgraph turns
+# them into a joined, bulk-queryable dataset: one GraphQL call would link Monero
+# key material to EVM addresses across the entire history of the protocol. That
+# is a materially cheaper attack on a privacy protocol's users than scraping.
+#
+# So the subgraph serves what the *book* needs — browse, filter, track state —
+# and the app reads key material straight from the contract for the single offer
+# it is party to. Reveals are exposed as booleans so clients can still tell when
+# a key became available without the schema handing out the values.
+#
+# Flipping this is a one-line change per field if the team decides otherwise.
+
+enum OfferKind {
+  BUY
+  SELL
+}
+
+# Contract ordering is not flow ordering: INVALID=0, OPEN=1, TAKEN=2,
+# CANCELLED=3, REFUNDED=4, READY=5, CLAIMED=6.
+enum OfferState {
+  OPEN
+  TAKEN
+  CANCELLED
+  REFUNDED
+  READY
+  CLAIMED
+}
+
+type Offer @entity(immutable: false) {
+  "Decimal offer id, matching the contract's nextOfferId sequence"
+  id: ID!
+  offerId: BigInt!
+  kind: OfferKind!
+  state: OfferState!
+
+  "Maker"
+  owner: Bytes!
+  "Restricted counterparty at open, or the taker once taken. Null when open to all."
+  counterparty: Bytes
+
+  "ETH side of the trade"
+  amount: BigInt!
+  "Stake put up by whichever side is not escrowing the full amount"
+  deposit: BigInt!
+  "XMR side, in atomic units"
+  xmrAmount: BigInt!
+
+  "Deadline for calling ready. Null until taken."
+  t0: BigInt
+  "Deadline for calling claim. Null until taken."
+  t1: BigInt
+  blockTaken: BigInt
+
+  "Whether the EVM side has published its private spend and view keys (quit)"
+  evmKeysRevealed: Boolean!
+  "Whether the XMR side has published its private spend key (claim or quit)"
+  xmrSpendKeyRevealed: Boolean!
+
+  createdAt: BigInt!
+  createdBlock: BigInt!
+  createdTx: Bytes!
+  updatedAt: BigInt!
+
+  transitions: [OfferTransition!]! @derivedFrom(field: "offer")
+}
+
+type OfferTransition @entity(immutable: true) {
+  "<offer id>-<tx hash>-<log index>"
+  id: ID!
+  offer: Offer!
+  state: OfferState!
+  timestamp: BigInt!
+  block: BigInt!
+  tx: Bytes!
+}
+
+"""
+An address with money in the contract that was not deliverable at payout time.
+withdrawable is maintained purely from logs: sum(PayoutCredit) - sum(AccountWithdrawal).
+"""
+type Account @entity(immutable: false) {
+  "Address, lowercase hex"
+  id: ID!
+  withdrawable: BigInt!
+  totalCredited: BigInt!
+  totalWithdrawn: BigInt!
+
+  credits: [PayoutCredit!]! @derivedFrom(field: "account")
+  withdrawals: [AccountWithdrawal!]! @derivedFrom(field: "account")
+}
+
+"A payout that could not be delivered and became a claimable credit."
+type PayoutCredit @entity(immutable: true) {
+  id: ID!
+  account: Account!
+  amount: BigInt!
+  timestamp: BigInt!
+  block: BigInt!
+  tx: Bytes!
+}
+
+type AccountWithdrawal @entity(immutable: true) {
+  id: ID!
+  account: Account!
+  amount: BigInt!
+  timestamp: BigInt!
+  block: BigInt!
+  tx: Bytes!
+}
+
+"Owner sweeping surplus ETH that was never owed to anyone."
+type OwnerRecovery @entity(immutable: true) {
+  id: ID!
+  to: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  block: BigInt!
+  tx: Bytes!
+}
+
+"""
+Market parameters as of a given block. Emitted at construction and on every
+change, so the full history is reconstructible from logs alone.
+"""
+type MarketParameters @entity(immutable: true) {
+  "<block number>-<log index>"
+  id: ID!
+  minimumOffer: BigInt!
+  maximumOffer: BigInt!
+  depositRatio: BigInt!
+  maximumOfferBookSize: BigInt!
+  t0Delay: BigInt!
+  t1Delay: BigInt!
+  timestamp: BigInt!
+  block: BigInt!
+  tx: Bytes!
+}
