@@ -1,1 +1,6 @@
 .DS_Store
+
+# Secrets — never commit. .env.example is the committed template.
+.env
+.env.*
+!.env.example
