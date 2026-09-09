@@ -75,14 +75,19 @@ the app.
       the fallback subgraph reads the already-computed `amount` / `deposit` /
       `t0` / `t1` out of the `offers` struct — but the contract is now
       log-complete, which keeps the indexer honest whichever path we take.
-- [ ] Confirm indexing target chain. Existing deployment, no new ones.
-- [ ] **Freeze the subgraph schema.** Include the privacy decision: index a
-      `revealed` boolean, not the Monero key values (see Open decisions).
-- [ ] Subgraph deployed to Subgraph Studio, answering a real query with a real
-      API key.
+- [x] Indexing target chain: **Sepolia**, contract deployed at
+      `0x67DB37c3be37B44c0506e5DF441437C83114bCd2`, block `11670176`. The
+      upstream mainnet v1.1 deployment predates four of the five events.
+- [x] **Subgraph schema frozen.** Privacy decision applied — reveals are
+      `evmKeysRevealed` / `xmrSpendKeyRevealed` booleans, no Monero key values
+      indexed. Rationale in `subgraph/README.md`.
+- [x] **Subgraph live on Studio** at `xmrp-2-p`, synced with no indexing errors.
+      Verified end to end: the constructor's `ParametersUpdated` round-trips to
+      GraphQL with all six values intact.
+      `https://api.studio.thegraph.com/query/5944/xmrp-2-p/version/latest`
 
-**Exit:** a live subgraph, a continuity boundary on paper, and an answer on
-eligibility.
+**Exit:** ~~a live subgraph~~ ✅, ~~a continuity boundary on paper~~ ✅ (root
+`README.md`), an answer on eligibility ⬅ **still the one open blocker.**
 
 ---
 
@@ -91,8 +96,14 @@ eligibility.
 Composition requires **2+ Graph products**. Two paths, and the cheap one is the
 baseline:
 
-- [ ] **Baseline — Subgraph + Token API.** Two Graph products, and the second is
-      one REST call. Cheap insurance that the entry qualifies at all.
+- [~] **Baseline — Subgraph + Token API.** Subgraph half is **done and live**
+      (Day 1). Token API is one REST call in the frontend and lands with Day 3.
+      Once both are in, the entry qualifies on product count alone.
+- [ ] **Seed the book.** `nextOfferId` is 1 — the subgraph currently returns an
+      empty `offers` list, which is a weak thing to demo. Needs offers in both
+      directions and at least one walked through to `CLAIMED`, which means
+      generating canonical ed25519 points (the deployer script has commented-out
+      scaffolding using `Ed25519.scalarMultBase`).
 - [ ] **Upgrade — Substreams.** Substreams-powered subgraph, built downstream of
       [`pinax-network/substreams-evm`](https://github.com/pinax-network/substreams-evm)
       or [`streamingfast/substreams-chain-modules`](https://github.com/streamingfast/substreams-chain-modules).
