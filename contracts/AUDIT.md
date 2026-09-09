@@ -41,6 +41,25 @@ upstream design refunded the delta and this contract dropped that step.
 
 **Fix.** Refund the excess to the taker after the state transition.
 
+**Why refund rather than reject.** `require(msg.value == required)` is the cheaper
+check, but the required figure is not something a client can always reproduce
+exactly: `offer.deposit` is set with ceiling division at `openOffer`, and a SELL
+offer's `amount` with a floor division, so a client replicating that arithmetic
+off-chain lands a wei out without much effort. Under equality that is a hard
+revert and a retry the user cannot debug; under `>=` plus a refund, a client that
+pads succeeds and gets the padding back.
+
+The gas argument cuts the same way. `_payout` runs only inside `if (excess > 0)`,
+so the exact-payment path pays a subtraction and a branch — under a hundred gas.
+The ~9k for a value-bearing call is charged only to whoever overpaid, which is the
+right party to charge.
+
+**On the severity.** No attacker can force an overpayment; this needs user or
+client error to fire. Graded strictly on attacker-reachability it is a medium. It
+is kept at H because the loss is unrecoverable for the user and accrues to the
+owner through `recover()` — the contract turns a mistake into revenue for a party
+that is meant to be non-custodial.
+
 ## H3 — a counterparty that rejects ETH freezes both sides permanently
 
 `quit` paid the owner and the counterparty with `require(res)` on each. A taker
