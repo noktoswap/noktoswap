@@ -100,6 +100,11 @@ contract XMRP2P is Ownable {
     /// `withdrawable` as the sum of these minus the matching `Withdrawal`s.
     event PayoutCredited(address indexed to, uint256 amount);
 
+    /// The market parameters were set. Emitted at construction as well as on
+    /// every later change, so an indexer never has to read the initial values
+    /// out of the deployment transaction.
+    event ParametersUpdated(Parameters parameters);
+
     constructor(Parameters memory _parameters, address _owner) payable {
         _initializeOwner(_owner);
         _setParameters(_parameters);
@@ -417,6 +422,8 @@ contract XMRP2P is Ownable {
         );
         require(parameters.MINIMUM_OFFER > 0, ErrorParametersInvalid());
         require(parameters.MINIMUM_OFFER <= parameters.MAXIMUM_OFFER, ErrorParametersInvalid());
+
+        emit ParametersUpdated(_parameters);
     }
 
     function setParameters(Parameters memory _parameters) public onlyOwner {

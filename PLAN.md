@@ -69,8 +69,12 @@ the app.
       Lo-Fi designs) versus what's built during the event. Required by both
       tracks. Write it now; it takes twenty minutes and is worthless written
       Sunday morning.
-- [ ] `ParametersUpdated` event on `setParameters`, then stop touching the
-      contracts. Contract work is done.
+- [x] **Contract work is done.** `ParametersUpdated` added, emitted from
+      `_setParameters` so construction is covered too. It was not strictly
+      required — Substreams decodes the `setParameters` call from calldata, and
+      the fallback subgraph reads the already-computed `amount` / `deposit` /
+      `t0` / `t1` out of the `offers` struct — but the contract is now
+      log-complete, which keeps the indexer honest whichever path we take.
 - [ ] Confirm indexing target chain. Existing deployment, no new ones.
 - [ ] **Freeze the subgraph schema.** Include the privacy decision: index a
       `revealed` boolean, not the Monero key values (see Open decisions).
