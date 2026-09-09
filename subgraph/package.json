@@ -6,9 +6,9 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy": "graph deploy xmrp2p",
-    "create-local": "graph create --node http://localhost:8020/ xmrp2p",
-    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 xmrp2p",
+    "deploy": "graph deploy xmrp-2-p",
+    "create-local": "graph create --node http://localhost:8020/ xmrp-2-p",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 xmrp-2-p",
     "abi": "cd ../contracts && forge inspect XMRP2P abi --json > ../subgraph/abis/XMRP2P.json"
   },
   "dependencies": {

@@ -55,17 +55,33 @@ starts empty and has to be populated.
 `MarketParameters` is populated from the very first block synced — confirmed
 on-chain, all six values decode correctly.
 
-## Deploying to Studio
+## Live
 
-Needs a deploy key, which this repo does not carry:
+| | |
+|---|---|
+| Studio | https://thegraph.com/studio/subgraph/xmrp-2-p |
+| Query | `https://api.studio.thegraph.com/query/5944/xmrp-2-p/version/latest` |
+| Slug | `xmrp-2-p` |
 
 ```shell
-pnpm exec graph auth <deploy-key>        # from thegraph.com/studio
-pnpm exec graph deploy <subgraph-slug>   # after creating the subgraph in Studio
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $GRAPH_API_KEY" \
+  -d '{"query":"{ offers(first:5){ id offerId kind state } }"}' \
+  https://api.studio.thegraph.com/query/5944/xmrp-2-p/version/latest
 ```
 
-The manifest, schema and mappings are ready — `graph build` passes against
-Sepolia.
+Note that `MarketParameters` already ends in `s`, so graph-node exposes the
+by-id lookup as `marketParameters(id:)` and the **list** as
+`marketParameters_collection(first:)`. Every other entity pluralises normally.
+
+## Redeploying
+
+```shell
+pnpm exec graph auth $GRAPH_DEPLOY_KEY   # Studio → xmrp-2-p → Deploy Key
+pnpm run codegen && pnpm run build
+pnpm exec graph deploy xmrp-2-p --version-label v0.0.2
+```
 
 ## Why `hydrate()` makes an eth_call
 
