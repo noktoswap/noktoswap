@@ -39,3 +39,14 @@ forge script script/XMRP2PDeployer.s.sol:XMRP2PDeployer \
 Parameters are set in the script. Note that `MAXIMUM_OFFER_BOOK_SIZE` now bounds
 the number of **open** offers rather than the number ever created — see H1 in the
 audit.
+
+## Deployments
+
+| Network | Address | Notes |
+|---|---|---|
+| Mainnet | [`0xad6871d4…`](https://etherscan.io/address/0xad6871d44804288ba4393464c63544d6691d76ba) | upstream v1.1, pre-audit — indexed by nothing here |
+| Sepolia | [`0x67DB37c3…`](https://sepolia.etherscan.io/address/0x67DB37c3be37B44c0506e5DF441437C83114bCd2) | this contract, block `11670176` — the subgraph target |
+
+The deployer script takes `XMRP2P_OWNER` from the environment, defaulting to the
+`OWNER` constant, so testnet deploys can own themselves without touching the
+mainnet configuration.

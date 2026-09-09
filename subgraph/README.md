@@ -32,26 +32,40 @@ so a client can still tell *when* a key became available.
 This is a posture, not a technical constraint. Exposing any of these is one line
 per field in `schema.graphql` plus one in `hydrate()`.
 
-### Which deployment to index
+### Which deployment to index — settled: Sepolia
 
-`subgraph.yaml` currently points at the upstream v1.1 deployment
-(`0xad6871d4…`, mainnet). That contract has real offers but predates the
-`Withdrawal`, `Recovered`, `PayoutCredited` and `ParametersUpdated` events — so
-those four handlers never fire against it, and `Account` / `PayoutCredit` /
-`AccountWithdrawal` / `MarketParameters` stay empty. The offer book itself
-indexes correctly.
+| | |
+|---|---|
+| Address | `0x67DB37c3be37B44c0506e5DF441437C83114bCd2` |
+| Network | Sepolia (11155111) |
+| Deployed at block | `11670176` |
+| Tx | `0x833b6954c5cd96f01eac69ba57cffce2943566f5605fa4f95daf6282e7a3ff6d` |
+| Owner | `0x205d2686da3Bf33f64C17f21462c51B5eaD462CF` |
 
-The alternative is deploying the fixed contract and indexing that: all handlers
-live, but a book you have to populate yourself. "Live data from a Graph provider"
-is a Studio/Graph Market requirement, not a mainnet one, so a testnet deployment
-qualifies.
+The upstream mainnet v1.1 deployment (`0xad6871d4…`) has real offers but predates
+`Withdrawal`, `Recovered`, `PayoutCredited` and `ParametersUpdated`, so four of
+the five handlers would never fire and most of the schema would sit empty. The
+Sepolia deployment is the fixed contract, where every event in the ABI is live.
 
-**Still open.** Pick before the demo — it changes what the video can show.
+"Live data from a Graph provider" is a Studio / Graph Market requirement, not a
+mainnet one, so this qualifies for the bounty. The tradeoff is that the book
+starts empty and has to be populated.
 
-### `startBlock` is 0
+`ParametersUpdated` fires from the constructor in block `11670176`, so
+`MarketParameters` is populated from the very first block synced — confirmed
+on-chain, all six values decode correctly.
 
-Needs the creation block of whichever address is chosen. At 0 the initial sync
-walks all of history for nothing.
+## Deploying to Studio
+
+Needs a deploy key, which this repo does not carry:
+
+```shell
+npx graph auth <deploy-key>          # from thegraph.com/studio
+npx graph deploy <subgraph-slug>     # after creating the subgraph in Studio
+```
+
+The manifest, schema and mappings are ready — `graph build` passes against
+Sepolia.
 
 ## Why `hydrate()` makes an eth_call
 

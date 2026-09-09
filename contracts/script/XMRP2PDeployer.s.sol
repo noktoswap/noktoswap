@@ -17,6 +17,10 @@ contract XMRP2PDeployer is Script {
     uint256 constant SAMPLE_EVM_PRIVATE_VIEW_KEY = 0x3c27472aaaf62fcea2ef1e0f1ff031d5fcec66c60275c793453f93f5387fa207;
 
     function run() public {
+        // Defaults to OWNER so mainnet behaviour is unchanged; testnet deploys
+        // set XMRP2P_OWNER so owner-only functions are reachable.
+        address owner = vm.envOr("XMRP2P_OWNER", OWNER);
+
         vm.startBroadcast();
 
         XMRP2P xmrp2p = new XMRP2P{value: VALUE}(
@@ -28,9 +32,10 @@ contract XMRP2PDeployer is Script {
                 T0_DELAY: 24 hours,
                 T1_DELAY: 24 hours
             }),
-            OWNER
+            owner
         );
         console.log("Contract address: ", address(xmrp2p));
+        console.log("Owner: ", owner);
 
         // (uint256 spendX, uint256 spendY) =
         //     Ed25519.scalarMultBase(Ed25519.changeEndianness(SAMPLE_EVM_PRIVATE_SPEND_KEY));

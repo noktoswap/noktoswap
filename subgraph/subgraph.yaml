@@ -8,19 +8,17 @@ schema:
 dataSources:
   - kind: ethereum/contract
     name: XMRP2P
-    # TARGET DECISION — see README.md in this directory.
-    #
-    # This points at the upstream v1.1 deployment, which carries real offers but
-    # predates the Withdrawal / Recovered / PayoutCredited / ParametersUpdated
-    # events. Those handlers simply never fire against it; the offer book indexes
-    # fine. Repoint at the fixed contract once it is deployed.
-    network: mainnet
+    # The fixed contract on Sepolia — every event in the ABI is live here.
+    # The upstream mainnet v1.1 deployment (0xad6871d4…) has real offers but
+    # predates Withdrawal / Recovered / PayoutCredited / ParametersUpdated, so
+    # four of the five handlers would never fire against it.
+    network: sepolia
     source:
-      address: "0xad6871d44804288ba4393464c63544d6691d76ba"
+      address: "0x67DB37c3be37B44c0506e5DF441437C83114bCd2"
       abi: XMRP2P
-      # TODO: deployment block of the address above — Etherscan, contract
-      # creation tx. Leaving this at 0 makes the initial sync take hours.
-      startBlock: 0
+      # Deployment block. ParametersUpdated fires in this very block from the
+      # constructor, so MarketParameters is populated from the first block synced.
+      startBlock: 11670176
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
