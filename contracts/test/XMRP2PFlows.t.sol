@@ -93,6 +93,8 @@ contract XMRP2PFlowsTest is Test {
         picky.take{value: 0.05 ether}(offerId, xmrSpendPub, xmrViewPriv);
 
         // Alice exits before t0; the hostile counterparty cannot stop her.
+        vm.expectEmit(true, false, false, true, address(market));
+        emit XMRP2P.PayoutCredited(address(picky), 0.05 ether);
         vm.prank(alice);
         market.quit(offerId, evmSpendPriv, evmViewPriv);
 
@@ -102,6 +104,8 @@ contract XMRP2PFlowsTest is Test {
         // Once it can accept ETH again, it collects.
         picky.setOpen(true);
         uint256 before = address(picky).balance;
+        vm.expectEmit(true, false, false, true, address(market));
+        emit XMRP2P.Withdrawal(address(picky), 0.05 ether);
         picky.withdraw();
         assertEq(address(picky).balance - before, 0.05 ether, "credit not collectable");
         assertEq(market.withdrawable(address(picky)), 0, "credit not cleared");

@@ -89,6 +89,17 @@ contract XMRP2P is Ownable {
 
     event OfferEvent(uint256 indexed offer_id, OfferType indexed kind, OfferState indexed state);
 
+    /// A credit from an undeliverable payout was collected by its owner.
+    event Withdrawal(address indexed to, uint256 amount);
+
+    /// Surplus ETH not owed to anyone was swept by the contract owner.
+    event Recovered(address indexed to, uint256 amount);
+
+    /// A payout could not be delivered and was credited for later collection.
+    /// Carries the delta, not the running balance: an indexer reconstructs
+    /// `withdrawable` as the sum of these minus the matching `Withdrawal`s.
+    event PayoutCredited(address indexed to, uint256 amount);
+
     constructor(Parameters memory _parameters, address _owner) payable {
         _initializeOwner(_owner);
         _setParameters(_parameters);
@@ -116,6 +127,7 @@ contract XMRP2P is Ownable {
             liability -= amount;
         } else {
             withdrawable[to] += amount;
+            emit PayoutCredited(to, amount);
         }
     }
 
@@ -127,6 +139,8 @@ contract XMRP2P is Ownable {
         liability -= amount;
         (bool res,) = payable(msg.sender).call{value: amount}("");
         require(res, ErrorUnableToRefund());
+
+        emit Withdrawal(msg.sender, amount);
     }
 
     function _keySanity(uint256 pubKey) internal {
@@ -381,6 +395,8 @@ contract XMRP2P is Ownable {
         require(surplus > 0, ErrorInvalidAmount());
         (bool res,) = payable(msg.sender).call{value: surplus}("");
         require(res, ErrorUnableToRefund());
+
+        emit Recovered(msg.sender, surplus);
     }
 
     function listOffers(uint256 offset, uint256 count, bool reverse) public view returns (Offer[] memory) {
