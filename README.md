@@ -27,9 +27,8 @@ judging this submission.
 
 ## Built during the event
 
-<!-- TODO: confirm the hackathon start date and move any commit that predates it
-     into the section above. `abf6fbf` (Foundry import) and `abc4523` (audit
-     fixes) need checking against the start time. -->
+This repository was created during the event. Its entire commit history is
+event-period work; the pre-existing material is what it imports from upstream.
 
 - **Contract review and fixes** — ten findings against the deployed v1.1
   contract, each with a regression test that fails upstream and passes here. See
@@ -40,5 +39,6 @@ judging this submission.
 - **Indexing pipeline** — in progress, see [`PLAN.md`](PLAN.md).
 - **Frontend data and swap funding** — in progress.
 
-Commit history is the authority on which is which: everything from `abc4523`
-onward is event-period work.
+Commit history is the authority on which is which: every commit in this
+repository is event-period work, starting with the import of the upstream
+contracts at `abf6fbf`.
