@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 //
 // ==============================
-// xmrp2p.eth - v1.1 ed25519 compressed
+// Noktoswap - v1.1 ed25519 compressed
 //
-// Published by v3xlabs
+// Forked from xmrp2p.eth, published by v3xlabs. See AUDIT.md for the fixes.
 // ==============================
 
 pragma solidity ^0.8.34;

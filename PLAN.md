@@ -1,4 +1,4 @@
-# xmrp2p — ETHOnline 2026 sprint plan
+# Noktoswap — ETHOnline 2026 sprint plan
 
 **Submission deadline: Sunday 13 September 2026, 12:00 EDT.**
 Written Wednesday 9 September — roughly three and a half days.
@@ -52,7 +52,7 @@ The Graph's composability track carries **no pool label** — no "Start Fresh", 
 1. It is open to everyone, and continuity teams may enter. (What the track text
    itself supports — it applies its requirements uniformly.)
 2. Unlabelled means Classic, which would require the project to have begun after
-   the start — which xmrp2p did not.
+   the start — which this project did not.
 
 Reading 1 is more likely, but $5,000 and the entire Graph entry depend on it.
 **Ask ETHGlobal in Discord immediately.** If the answer is (2), the Graph entry

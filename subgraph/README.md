@@ -1,4 +1,4 @@
-# xmrp2p subgraph
+# Noktoswap subgraph
 
 Indexes the offer book, the payout-credit lifecycle, and market parameter
 history.

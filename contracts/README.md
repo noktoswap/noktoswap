@@ -1,4 +1,4 @@
-# xmrp2p contracts
+# Noktoswap contracts
 
 Atomic ETH ↔ XMR swaps. The contract escrows the ETH side and releases it only
 against the reveal of a Monero private spend key, so taking the payout and

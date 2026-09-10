@@ -1,6 +1,6 @@
 specVersion: 1.0.0
-description: xmrp2p — atomic ETH/XMR swap offer book
-repository: https://github.com/v3xlabs/xmrp2p
+description: Noktoswap — atomic ETH/XMR swap offer book
+repository: https://github.com/xmrp2p/xmrp2p
 indexerHints:
   prune: auto
 schema:
