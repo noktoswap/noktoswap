@@ -27,6 +27,66 @@ anything.
 
 ---
 
+## Where the integrations live
+
+### The Graph — composition, and what it made easier
+
+Two Graph products, doing different jobs:
+
+| | Product | Answers | Code |
+|---|---|---|---|
+| Offer book | Subgraph (Studio) | the protocol's own state | [`subgraph/`](subgraph/README.md), [`web/src/lib/subgraph.ts`](web/src/lib/subgraph.ts) |
+| Wallet holdings | Token API | *which* tokens an address holds | [`web/src/lib/tokenApi.ts`](web/src/lib/tokenApi.ts) |
+
+**What became easier, concretely:**
+
+`OfferEvent` carries three indexed topics and **no data**. Everything past
+`(id, kind, state)` has to be read back from the contract, so listing a book of
+*n* offers without an indexer is *n* archive `eth_call`s. The subgraph turns the
+whole book into one GraphQL query — and the client's filtering, state tracking
+and counts fall out of it rather than being built.
+
+Two things then need **no contract reads at all**, which is the sharper claim.
+`Account.withdrawable` is exactly `sum(PayoutCredit) - sum(AccountWithdrawal)` —
+provable from logs because credits accrue only in `_payout`'s failure branch and
+`withdraw()` always drains the full balance. Full market-parameter history is
+reconstructible for the same reason. Both are only possible because we **added
+events to the contract for the indexer's benefit** — `Withdrawal`, `Recovered`,
+`PayoutCredited`, `ParametersUpdated`. Upstream emitted only `OfferEvent`, which
+left three balance-affecting paths invisible.
+
+And there is **no balance-indexing code in this repository**, because a
+standardized product already serves it. That is the composition: a bespoke
+subgraph for the thing only we know about, a commodity API for the thing everyone
+needs. `web/README.md` documents where each one is load-bearing and where the
+Token API's coverage stops.
+
+The split is principled rather than convenient: **the subgraph serves browsing,
+the contract serves money.** An indexer lags by design; `take` does not. So
+`offer.amount` and `offer.deposit` are re-read on-chain at the moment of the
+action — [`web/src/lib/contract.ts`](web/src/lib/contract.ts) is the only path to
+a figure that reaches a `msg.value`.
+
+### Uniswap — Trading API, exact-output
+
+| | |
+|---|---|
+| Quotes, approvals, swap calldata | [`web/src/lib/uniswap.ts`](web/src/lib/uniswap.ts) |
+| Review screen and step list | [`web/src/components/SwapReview.tsx`](web/src/components/SwapReview.tsx) |
+| Widget and draft state | [`web/src/components/SwapWidget.tsx`](web/src/components/SwapWidget.tsx), [`web/src/state/swap.ts`](web/src/state/swap.ts) |
+| Developer feedback | [`FEEDBACK.md`](FEEDBACK.md) |
+
+Endpoints: `/quote`, `/check_approval`, `/swap`, `/swappable_tokens`.
+
+The escrow takes native ETH and `take` reverts below `required`, so the ETH leg
+is fixed and the token leg is variable — `EXACT_OUTPUT`. That direction matters:
+slippage lands on the **input** token, so the ETH reaching the escrow is not the
+slippage-bearing side, and anything above `required` is refunded by `take` itself
+([`AUDIT.md`](contracts/AUDIT.md) H2). A taker holding no ETH can still meet a
+precise figure.
+
+---
+
 ## Prior work
 
 This project builds on [`v3xlabs/xmrp2p`](https://github.com/v3xlabs/xmrp2p),
