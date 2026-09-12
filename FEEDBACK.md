@@ -25,9 +25,19 @@ would let the output land somewhere else.
 
 So funding an escrow is irreducibly **two transactions**: swap to ETH, wait for
 it to land in the wallet, then call `take` or `openOffer`. We cannot bundle them,
-and the user is exposed in between — if the second transaction fails or they walk
-away, they are holding ETH they converted for a purpose they did not complete. On
-a protocol with time-locked deadlines that gap is not cosmetic.
+and the gap is not merely untidy — it is a race the user loses.
+
+Offers are indivisible and first-come, and the quote is `EXACT_OUTPUT` sized to
+*one specific offer's* `required` figure. Between the two transactions anyone can
+take that offer. The user is then holding an oddly-sized amount of ETH priced
+against a trade that no longer exists, and unwinding it costs another swap's
+spread and another round of gas. The same applies, less dramatically, whenever
+the second transaction simply fails or is abandoned.
+
+Nothing is stolen — the ETH is in the user's own wallet — so this is economic and
+UX risk rather than a custody one. And it is not unique to Uniswap; any
+swap-then-act flow has it. The point is narrower: the Trading API cannot
+*express* the composition that would remove it.
 
 Our `SwapReview` step list says so explicitly rather than implying atomicity,
 because implying it would be a lie the user pays for.
