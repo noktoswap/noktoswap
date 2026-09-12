@@ -1,7 +1,8 @@
 import { useNavigate } from '@solidjs/router'
 import { useQuery } from '@tanstack/solid-query'
 import { For, Show, createMemo, createSignal, type JSX } from 'solid-js'
-import { sendTransaction, switchChain, waitForTransactionReceipt } from '@wagmi/core'
+import { sendTransaction, signTypedData, switchChain, waitForTransactionReceipt } from '@wagmi/core'
+import type { Hex } from 'viem'
 import { NATIVE, chainLabel } from '../lib/chains'
 import { openOffer, valueToOpen } from '../lib/contract'
 import { formatEth, formatToken, formatUsd, formatXmr, tryParseEth, tryParseXmr } from '../lib/format'
@@ -18,6 +19,7 @@ import {
   checkApproval,
   createSwap,
   describeRoute,
+  permitTypedData,
   quoteFunding,
   type FundingQuote,
   type TxRequest,
@@ -172,13 +174,19 @@ export const SwapReview = (): JSX.Element => {
 
   const needsApproval = () => approval.data?.approval != null
 
+  const needsPermit = () => funding.data?.raw.permitData != null
+
   /**
-   * The steps, in the order they actually happen. Approval only appears when the
-   * API says one is outstanding — a step that is always skipped teaches nothing.
+   * The steps, in the order they actually happen. Approval and the signature each
+   * appear only when the API asks for one — a step that is always skipped teaches
+   * nothing, and this list has to match what `execute` advances through or the
+   * progress marker drifts ahead of the wallet.
    */
   const steps = createMemo(() => {
     const list: string[] = []
     if (needsSwap() && needsApproval()) list.push(`Approve ${token().symbol}`)
+    // A signature, not a transaction — so it says sign, and says it is free.
+    if (needsSwap() && needsPermit()) list.push(`Sign the ${token().symbol} spending permission (no gas)`)
     if (needsSwap()) list.push(`Swap ${token().symbol} for exactly ${formatEth(escrowValue() ?? 0n)} ETH`)
     list.push('Open the order and escrow the ETH')
     return list
@@ -226,17 +234,26 @@ export const SwapReview = (): JSX.Element => {
           setStep(++index)
         }
 
-        // Permit2 signing is not wired up: the API returns permitData when a
-        // signature is required, and submitting the swap without it would fail
-        // at simulation. Surface that rather than sending a doomed transaction.
-        if (quote.raw.permitData) {
-          throw new Error(
-            'This route needs a Permit2 signature, which is not implemented yet. Approve the router directly or pick ETH.',
-          )
+        /*
+         * Permit2 signature, when the API asks for one.
+         *
+         * This costs no gas and sends no transaction — it is an off-chain
+         * signature granting the router a bounded, expiring allowance, which is
+         * why it is the common path: `approve` only shows up when Permit2 itself
+         * has no allowance yet. Submitting the swap without the signature would
+         * fail at simulation.
+         */
+        const permit = quote.raw.permitData
+        let signature: Hex | undefined
+        if (permit) {
+          signature = await signTypedData(config, permitTypedData(permit))
+          setStep(++index)
         }
 
         const swap = await createSwap({
           quote: quote.raw.quote,
+          signature,
+          permitData: permit,
           deadline: deadlineAt(app.now()),
         })
         await sendRequest(swap)

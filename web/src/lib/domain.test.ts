@@ -21,6 +21,7 @@ import {
   pointToUint256,
   proves,
 } from './keys'
+import { permitTypedData, type PermitData } from './uniswap'
 import {
   CHAINS,
   chainInfo,
@@ -1276,5 +1277,113 @@ describe('on an OPEN offer, counterparty is a restriction not a party', () => {
     expect(sideOf(taken, BOB)).toBe('xmr')
     expect(sideOf(taken, ALICE)).toBe('evm')
     expect(canTake(taken, CAROL)).toBe(false)
+  })
+})
+
+describe('the Permit2 payload is reshaped, not passed through', () => {
+  /**
+   * Captured verbatim from a live EXACT_OUTPUT quote (USDC → ETH, mainnet). The
+   * integers are strings because JSON has no integer type, and `amount` is the
+   * uint160 max — 49 digits, far past Number.MAX_SAFE_INTEGER.
+   */
+  const LIVE: PermitData = {
+    domain: {
+      name: 'Permit2',
+      chainId: 1,
+      verifyingContract: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    },
+    types: {
+      PermitSingle: [
+        { name: 'details', type: 'PermitDetails' },
+        { name: 'spender', type: 'address' },
+        { name: 'sigDeadline', type: 'uint256' },
+      ],
+      PermitDetails: [
+        { name: 'token', type: 'address' },
+        { name: 'amount', type: 'uint160' },
+        { name: 'expiration', type: 'uint48' },
+        { name: 'nonce', type: 'uint48' },
+      ],
+    },
+    values: {
+      details: {
+        token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+        amount: '1461501637330902918203684832716283019655932542975',
+        expiration: '1791839145',
+        nonce: '0',
+      },
+      spender: '0x66a9893cc07d91d95644aedd05d03f95e1dba8af',
+      sigDeadline: '1789248945',
+    },
+  }
+
+  it('signs the type nothing else references', () => {
+    // PermitSingle mentions PermitDetails, so PermitDetails is a dependency.
+    // Taking the first key would pass here and break on any reordering.
+    expect(permitTypedData(LIVE).primaryType).toBe('PermitSingle')
+
+    const reordered: PermitData = {
+      ...LIVE,
+      types: { PermitDetails: LIVE.types.PermitDetails!, PermitSingle: LIVE.types.PermitSingle! },
+    }
+    expect(permitTypedData(reordered).primaryType).toBe('PermitSingle')
+  })
+
+  it('coerces integers to bigint without losing precision', () => {
+    const message = permitTypedData(LIVE).message as {
+      details: { amount: bigint; expiration: bigint; nonce: bigint; token: string }
+      sigDeadline: bigint
+    }
+
+    // The whole reason this is not Number(): 2^160 - 1 exactly, not rounded.
+    expect(message.details.amount).toBe(2n ** 160n - 1n)
+    expect(message.details.amount).toBe(1461501637330902918203684832716283019655932542975n)
+    expect(message.details.expiration).toBe(1791839145n)
+    // Zero must survive as 0n, not become undefined or ''.
+    expect(message.details.nonce).toBe(0n)
+    expect(message.sigDeadline).toBe(1789248945n)
+
+    // Addresses are not integers and must pass through untouched — checksum and all.
+    expect(message.details.token).toBe('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
+  })
+
+  it('what Number() would have done to that amount', () => {
+    // Documents the bug this function exists to avoid: the wallet would have
+    // displayed and signed a different allowance than the one granted.
+    const lossy = BigInt(Number('1461501637330902918203684832716283019655932542975'))
+    expect(lossy).not.toBe(2n ** 160n - 1n)
+  })
+
+  it('recurses into nested structs and arrays', () => {
+    const batch: PermitData = {
+      domain: { chainId: 1 },
+      types: {
+        PermitBatch: [
+          { name: 'details', type: 'PermitDetails[]' },
+          { name: 'sigDeadline', type: 'uint256' },
+        ],
+        PermitDetails: [{ name: 'amount', type: 'uint160' }],
+      },
+      values: {
+        details: [{ amount: '1' }, { amount: '2' }],
+        sigDeadline: '99',
+      },
+    }
+    const message = permitTypedData(batch).message as {
+      details: { amount: bigint }[]
+      sigDeadline: bigint
+    }
+    expect(message.details.map((d) => d.amount)).toEqual([1n, 2n])
+    expect(message.sigDeadline).toBe(99n)
+  })
+
+  it('refuses a payload whose message type is ambiguous', () => {
+    // Better to fail loudly than sign the wrong struct.
+    const twoRoots: PermitData = {
+      domain: {},
+      types: { A: [{ name: 'x', type: 'uint256' }], B: [{ name: 'y', type: 'uint256' }] },
+      values: {},
+    }
+    expect(() => permitTypedData(twoRoots)).toThrow(/cannot tell which type to sign/)
   })
 })

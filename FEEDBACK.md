@@ -76,8 +76,27 @@ and there is no way to ask beforehand.
 This matters because the **shape of the flow changes**: one route is
 approve → swap, another is approve → sign → swap. A review screen that tells the
 user what they are about to do has to quote first, then rewrite its own step list.
-Ours currently detects `permitData` and refuses rather than sending a transaction
-that would fail at simulation — a known gap on our side, but the honest stop.
+Ours does exactly that — the signing step appears in the list only once a quote
+has come back carrying `permitData`, so the screen cannot name its own steps until
+after the network call it is describing.
+
+Two smaller things surfaced while implementing the signing, both cheap to fix in
+the docs:
+
+`permitData.types` carries every struct in the payload — `PermitSingle` *and* its
+`PermitDetails` dependency — with nothing marking which one is the message.
+EIP-712 signing needs a `primaryType`, so a client has to derive it (the type
+nothing else references) or hardcode `'PermitSingle'` and hope the payload never
+becomes a `PermitBatch`. Returning `primaryType` alongside `domain`/`types`/
+`values` would remove the guesswork; it is one field.
+
+And because JSON has no integer type, `details.amount` arrives as a 49-digit
+*string* — uint160 max. viem and ethers both want `bigint` for `uint*` in typed
+data, so every client must walk the struct and coerce. Passing it through
+`Number()` yields a rounded value that still signs successfully and grants a
+different allowance than the one displayed. Worth an explicit warning in the
+`permitData` description, since the failure is silent and the artifact is a
+signature.
 
 **What would fix it:** since the form is already a request parameter, make the
 requirement one too — a `signatureSupport: 'none'` that returns a route not needing

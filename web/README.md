@@ -8,7 +8,7 @@ funds escrows through the Uniswap Trading API.
 pnpm install
 cp .env.example .env      # then fill in the three keys
 pnpm dev                  # http://localhost:5173
-pnpm test                 # 95 checks, no network
+pnpm test                 # 129 checks, no network
 pnpm test:live            # checks the feeds and RPCs still answer
 pnpm build                # typecheck + bundle
 ```
@@ -508,10 +508,19 @@ and a large amount of risk without test vectors, so the key panels hand the
 verified halves to a real wallet instead. This is the highest-value next piece of
 work, and it wants vectors before it wants code.
 
-**Permit2 signing is not wired up.** `/quote` returns `permitData` when a
-signature is required; `SwapReview` detects that and refuses rather than sending
-a transaction that would fail at simulation. Routes that need only a plain router
-approval work today.
+**Permit2 signing works.** `/quote` returns `permitData` when a signature is
+required — which, for a token-funded escrow, is the common case rather than the
+exception: `approve` only appears when Permit2 itself holds no allowance yet.
+`permitTypedData` in `lib/uniswap.ts` reshapes that payload for viem (deriving the
+primary type, coercing the string integers to `bigint`) and `SwapReview` signs it
+with `signTypedData`, adding a step to its own list when one is needed. It costs
+no gas.
+
+`permit.live.test.ts` proves the signature is the one Permit2 wants, which the
+unit tests cannot: it signs a real quote with a throwaway key, posts it to
+`/swap`, and asserts the 65 bytes come back embedded verbatim in the Universal
+Router calldata. A wrong primary type, field order, or rounded `amount` all still
+produce valid-looking bytes, so the recovered signer is the only real check.
 
 **The book is nearly empty.** One offer on Sepolia; mainnet and Base have none
 yet. Seeding is a task, not a client gap — see `PLAN.md`. Note the knock-on: with

@@ -2,9 +2,25 @@ name: CI
 
 permissions: {}
 
+# Foundry only has something to say when Solidity changed. The web client and the
+# subgraph share this repo and are touched far more often, and a contracts job
+# firing on those pushes reports a green tick for code it never compiled — which
+# is worse than no signal, because it reads like one.
+#
+# `.gitmodules` and the submodule pointer are in scope: forge-std moving changes
+# what `forge test` compiles against just as much as editing a contract does.
+# `workflow_dispatch` stays unfiltered so this is always runnable by hand.
 on:
   push:
+    paths:
+      - 'contracts/**'
+      - '.gitmodules'
+      - '.github/workflows/test.yml'
   pull_request:
+    paths:
+      - 'contracts/**'
+      - '.gitmodules'
+      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 env:

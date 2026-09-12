@@ -97,12 +97,25 @@ export type ClassicQuote = {
   priceDifference?: number
 }
 
+/**
+ * An EIP-712 payload the API wants signed before it will build calldata.
+ *
+ * In practice this is always Permit2's `PermitSingle`, but the shape is left
+ * general — `types` is read rather than assumed, because the primary type and
+ * the integer fields are both derived from it below.
+ */
+export type PermitData = {
+  domain: Record<string, unknown>
+  types: Record<string, { name: string; type: string }[]>
+  values: Record<string, unknown>
+}
+
 export type QuoteResponse = {
   requestId: string
   routing: 'CLASSIC' | 'DUTCH_LIMIT' | 'DUTCH_V2' | 'DUTCH_V3' | 'BRIDGE' | 'LIMIT_ORDER' | 'PRIORITY' | 'WRAP'
   quote: ClassicQuote
   isTokenApprovalApplicable?: boolean
-  permitData?: unknown | null
+  permitData?: PermitData | null
   permitTransaction?: TxRequest
 }
 
@@ -162,11 +175,70 @@ export const checkApproval = async (params: {
   return { approval: body.approval ?? null, cancel: body.cancel ?? null }
 }
 
+/**
+ * Reshape the API's `permitData` into something viem will sign.
+ *
+ * Two conversions are doing real work here, and both are why this is a function
+ * rather than a spread at the call site:
+ *
+ * JSON has no integers, so every `uint*` arrives as a decimal *string* —
+ * `amount` is the uint160 max, 49 digits. viem's ABI encoder takes `bigint` or
+ * `number` for integer types and throws on a string, and `Number()` would
+ * silently round that amount past 2^53 into a value the wallet would display
+ * and sign as a different allowance. So integer fields are walked and coerced to
+ * BigInt, driven by `types` rather than by a hardcoded field list — which keeps
+ * this correct if the API adds a field or switches to `PermitBatch`.
+ *
+ * And `types` carries every struct in the payload with no marker for which one
+ * is the message. The primary type is the one nothing else references:
+ * `PermitSingle` mentions `PermitDetails`, so `PermitDetails` is a dependency
+ * and `PermitSingle` is the root. Picking the first key would work today and
+ * break on any reordering.
+ */
+export const permitTypedData = (
+  permit: PermitData,
+): { domain: Record<string, unknown>; types: PermitData['types']; primaryType: string; message: Record<string, unknown> } => {
+  const referenced = new Set<string>()
+  for (const fields of Object.values(permit.types)) {
+    // Strip array suffixes so `PermitDetails[]` counts as a reference too.
+    for (const field of fields) referenced.add(field.type.replace(/\[\d*\]$/, ''))
+  }
+  const roots = Object.keys(permit.types).filter((name) => !referenced.has(name))
+  if (roots.length !== 1) {
+    throw new Error(`cannot tell which type to sign: ${roots.join(', ') || 'none'}`)
+  }
+  const primaryType = roots[0] as string
+
+  const coerce = (typeName: string, value: unknown): unknown => {
+    const array = typeName.match(/^(.*)\[\d*\]$/)
+    if (array) {
+      const inner = array[1] as string
+      return Array.isArray(value) ? value.map((item) => coerce(inner, item)) : value
+    }
+    const struct = permit.types[typeName]
+    if (struct) {
+      const record = (value ?? {}) as Record<string, unknown>
+      return Object.fromEntries(struct.map((f) => [f.name, coerce(f.type, record[f.name])]))
+    }
+    if (/^u?int\d*$/.test(typeName) && (typeof value === 'string' || typeof value === 'number')) {
+      return BigInt(value)
+    }
+    return value
+  }
+
+  return {
+    domain: permit.domain,
+    types: permit.types,
+    primaryType,
+    message: coerce(primaryType, permit.values) as Record<string, unknown>,
+  }
+}
+
 /** Turn a quote into calldata. `signature` carries the Permit2 signature. */
 export const createSwap = async (params: {
   quote: ClassicQuote
   signature?: Hex
-  permitData?: unknown
+  permitData?: PermitData | null
   /** Unix seconds. Past this the signed swap is no longer valid. */
   deadline?: number
 }): Promise<TxRequest> => {

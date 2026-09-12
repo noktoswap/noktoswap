@@ -182,9 +182,11 @@ money paths were diffed against upstream's client, which caught a real bug — a
 OPEN offer's `counterparty` is a *restriction*, not a party, so reserved offers
 were showing a Cancel button to the taker and a Take button to everyone else.
 
-**Exit:** ⚠️ a user holding no ETH can quote and fund, but cannot yet take —
-`take` needs a seeded book, and paying in a token needs Permit2 signing on routes
-that ask for it. Both are named in `web/README.md`.
+**Exit:** ⚠️ a user holding no ETH can quote, sign and fund; `take` still needs a
+seeded book. Permit2 signing landed after this was written — `permitTypedData`
+plus `signTypedData`, verified end to end against the live `/swap` by
+`permit.live.test.ts`, so paying in a token now works on routes that ask for a
+signature as well as those that only need an approval.
 
 ### Carried forward — the one gap worth stating plainly
 
