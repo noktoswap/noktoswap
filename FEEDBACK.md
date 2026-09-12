@@ -15,57 +15,75 @@ approvals, swap calldata), [`web/src/components/SwapReview.tsx`](web/src/compone
 (the step list), [`web/src/state/swap.ts`](web/src/state/swap.ts).
 Endpoints used: `/quote`, `/check_approval`, `/swap`, `/swappable_tokens`.
 
+Every claim below was checked against the OpenAPI document at
+`https://trade-api.gateway.uniswap.org/v1/api.json` rather than against the prose
+docs, because in several cases the two do not say the same thing — which is itself
+most of the feedback.
+
 ---
 
-## 1. There is no way to send swap proceeds anywhere but the swapper
+## 1. Swap output can be *directed*, but not *used* — and the endpoint that fixes it is invisible from the main flow
 
-**This is the biggest one.** `/swap` returns calldata that pays the `swapper`
-address. There is no `recipient` parameter on a classic swap, and no hook that
-would let the output land somewhere else.
+**This is the biggest one for us**, and it took reading the OpenAPI document to
+state it correctly.
 
-So funding an escrow is irreducibly **two transactions**: swap to ETH, wait for
-it to land in the wallet, then call `take` or `openOffer`. We cannot bundle them,
-and the gap is not merely untidy — it is a race the user loses.
+`/quote` does accept a `recipient`, so output need not go to the `swapper`. That is
+not what we need. An escrow does not want ETH *sent* to it — it needs the ETH
+passed as `msg.value` to a specific function call, `take(offerId, spendingKey,
+viewingKey)`. Our contract's `receive()` reverts on a bare transfer precisely so
+funds cannot arrive without the call that accounts for them. A `recipient` can
+address output; it cannot invoke anything with it.
 
-Offers are indivisible and first-come, and the quote is `EXACT_OUTPUT` sized to
-*one specific offer's* `required` figure. Between the two transactions anyone can
-take that offer. The user is then holding an oddly-sized amount of ETH priced
-against a trade that no longer exists, and unwinding it costs another swap's
-spread and another round of gas. The same applies, less dramatically, whenever
-the second transaction simply fails or is abandoned.
+So the primary documented flow — `/quote → /check_approval → /swap` — makes funding
+an obligation irreducibly **two transactions**: swap to ETH, wait for it to land,
+then call `take`. The user is exposed in between: if the second transaction fails
+or they walk away, they hold ETH they converted for a purpose they did not
+complete. On a protocol with time-locked deadlines that gap is not cosmetic. Our
+`SwapReview` step list says so explicitly rather than implying atomicity.
 
-Nothing is stolen — the ETH is in the user's own wallet — so this is economic and
-UX risk rather than a custody one. And it is not unique to Uniswap; any
-swap-then-act flow has it. The point is narrower: the Trading API cannot
-*express* the composition that would remove it.
+**The API does have an answer, and we nearly missed it.** `/swap_5792` returns
+EIP-5792 batch calldata, and `/plan` builds multi-step flows whose steps include
+batched calls. A wallet that supports 5792 could execute swap-then-escrow as one
+atomic bundle. Neither endpoint appears in the getting-started path, the
+integration guide, or anything that led us from `/quote` to `/swap`; we found them
+by enumerating `paths` in the OpenAPI document after concluding composition was
+impossible.
 
-Our `SwapReview` step list says so explicitly rather than implying atomicity,
-because implying it would be a lie the user pays for.
+Two things would fix this, and the first is nearly free:
 
-**What would fix it:** a `recipient` field on classic quotes and swaps. Even
-restricted to EOAs it would not help us, so specifically: allow a contract
-recipient, or document a supported pattern for composing the Universal Router
-call with a follow-on contract call in one transaction. The SDKs can build
-Universal Router calldata, but the Trading API — which is the path the docs push
-you toward — cannot express it, and the two are not documented as
-interchangeable.
+- **Point at `/swap_5792` from the `/swap` docs.** One sentence — "to batch this
+  swap with other calls atomically, see `/swap_5792`" — would have saved us the
+  wrong conclusion, and it is the difference between "the API cannot compose" and
+  "the API composes, here".
+- **State that 5792 atomicity is conditional.** `wallet_getCapabilities` reports
+  atomic support per wallet, so an integrator cannot *rely* on the bundle being
+  atomic and still needs the two-transaction path as a fallback. Saying so in the
+  docs stops people shipping a flow that is atomic on their wallet and not on
+  their users'.
 
-## 2. Whether a route needs a Permit2 signature is discoverable only after quoting
+## 2. Whether a route needs a Permit2 signature *at all* is knowable only after quoting
 
-`/quote` returns `permitData` when a signature is required, and omits it when a
-plain router approval suffices. There is no way to ask in advance.
+The request already controls the *form* a permit takes: `generatePermitAsTransaction`
+chooses between calldata to broadcast and a message to sign, and its description is
+genuinely good — it explains the 30-day validity of a message versus indefinite
+allowance for calldata, and the gas consequence of each. `permitAmount` covers
+`FULL` versus `EXACT`. Credit where it is due.
 
-This is awkward because the *shape of the flow changes*: one route is
-approve → swap, another is approve → sign → swap. A UI that wants to show the
-user what they are about to do has to quote first, then rewrite its own step
-list. Ours currently detects `permitData` and refuses rather than sending a
-transaction that would fail at simulation — a known gap, but the honest stop.
+What is not controllable is whether a permit is needed *in the first place*.
+`/quote` returns `permitData` when a signature is required and omits it otherwise,
+and there is no way to ask beforehand.
 
-**What would fix it:** a deterministic field on `/quote` — or better, a request
-parameter like `signatureSupport: 'none'` that makes the API return a route not
-requiring one, the way `protocols` already constrains routing. Failing that,
-documenting which token/chain/protocol combinations require Permit2 would let a
-client plan without a round trip.
+This matters because the **shape of the flow changes**: one route is
+approve → swap, another is approve → sign → swap. A review screen that tells the
+user what they are about to do has to quote first, then rewrite its own step list.
+Ours currently detects `permitData` and refuses rather than sending a transaction
+that would fail at simulation — a known gap on our side, but the honest stop.
+
+**What would fix it:** since the form is already a request parameter, make the
+requirement one too — a `signatureSupport: 'none'` that returns a route not needing
+a permit, the way `protocols` already constrains routing. Failing that, document
+which token/chain/protocol combinations require Permit2, so a client can plan its
+own UI without a round trip.
 
 ## 3. `x-universal-router-version` must stay consistent across three calls, and nothing says so
 
@@ -117,18 +135,17 @@ does, and it is the thing that made a testnet flow possible for us. It is
 currently presented as a minor endpoint; for anyone developing against a testnet
 it is the most useful one in the set.
 
-## 7. `@uniswap/widgets` is archived but still the first thing you find
+## 7. The `@uniswap/widgets` deprecation notice does not point anywhere
 
-It is at v2.59.0, roughly three years stale, predates v4 entirely, and has
-ESM/CJS resolution problems with current bundlers. It is still what search and
-npm surface first, and there is no deprecation notice pointing anywhere.
+Correcting our own first impression here: the package **is** deprecated on npm —
+*"Package no longer supported. Contact Support…"* — at v2.59.0, last published
+about a year ago. We had assumed it was quietly abandoned with no notice, and that
+was wrong.
 
-We lost time on it before concluding it was abandoned and moving to the Trading
-API — which was the right destination and should have been the first signpost.
-
-**What would fix it:** a deprecation notice on the npm package and the repo
-README pointing at the Trading API. This is the cheapest item on this list and
-probably the one that saves the most collective developer hours.
+The remaining problem is smaller and still real: the notice sends you to npm
+support rather than to a replacement. For a package whose users are all trying to
+do the same thing, "use the Trading API" would be a strictly more useful sentence
+than "contact support", and it is the cheapest item on this list.
 
 ---
 
