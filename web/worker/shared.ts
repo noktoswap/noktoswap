@@ -1,5 +1,5 @@
 /**
- * The dev server's proxy, as edge functions.
+ * The dev server's proxy, as an edge Worker.
  *
  * `vite.config.ts` attaches three API credentials server-side so the browser
  * bundle never carries one. That property has to survive deployment or it was
@@ -7,8 +7,9 @@
  * moving the keys into `VITE_` variables to compensate would inline them into
  * the bundle, which is the exact thing the proxy exists to prevent.
  *
- * So these mirror `vite.config.ts` route for route. If you change one, change
- * both — a drift means the app works in development and 404s in production.
+ * So these mirror `vite.config.ts` upstream for upstream, and `index.ts` routes
+ * to them. If you change one, change both — a drift means the app works in
+ * development and 404s in production.
  */
 
 export type Env = {

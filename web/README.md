@@ -375,13 +375,14 @@ nothing.
 | `/api/token` | `api.pinax.network` | `Authorization: Bearer $TOKEN_API_JWT` |
 | `/api/uniswap` | `trade-api.gateway.uniswap.org` | `x-api-key: $UNISWAP_API_KEY` |
 
-**Deploying means standing up the same three rewrites as edge functions**, which
-`functions/` does — one handler per route, mirroring `vite.config.ts`. The client
-code needs no change, since it only ever talks to `/api/*`. If you change one,
-change both: a drift means the app works in development and 404s in production.
+**Deploying means standing up the same three rewrites at the edge**, which
+`worker/` does — `shared.ts` holds the upstreams and their headers, `index.ts`
+routes to them. The client code needs no change, since it only ever talks to
+`/api/*`. If you change one, change both: a drift means the app works in
+development and 404s in production.
 
-See [Deploying to Cloudflare Pages](#deploying-to-cloudflare-pages) for the
-settings and the two things `wrangler pages dev` caught that reasoning did not.
+See [Deploying to Cloudflare Workers](#deploying-to-cloudflare-workers) for the
+settings and the three things `wrangler dev` caught that reasoning did not.
 
 Two upstream facts worth knowing, both discovered the hard way:
 
@@ -394,61 +395,78 @@ Two upstream facts worth knowing, both discovered the hard way:
 
 ---
 
-## Deploying to Cloudflare Pages
+## Deploying to Cloudflare Workers
 
-The build is a static bundle plus `functions/`, which Pages picks up
-automatically and runs on the edge. Three settings, because the client is a
-subdirectory of this repo:
+Cloudflare consolidated Pages into Workers — their own guidance is now "if you
+are starting a new project, use Workers instead of Pages. Pages continues to
+work, but new features and optimizations are focused on Workers." So this deploys
+as a Worker with static assets, configured by `wrangler.jsonc`.
+
+That is not the same contract as Pages, and the difference is the whole reason
+this section exists:
+
+| | Pages | Workers (here) |
+|---|---|---|
+| Server code | `functions/` compiled to file-based routes | one entry script, `worker/index.ts` |
+| Route scoping | `_routes.json` | `assets.run_worker_first` |
+| SPA fallback | implicit, when no `404.html` | explicit `assets.not_found_handling` |
+
+`functions/` is **not** read by a Workers deployment. Cloudflare's migration guide
+offers `wrangler pages functions build` to compile the old layout, but the logic
+in `worker/shared.ts` was already plain functions of `(request, env, path)`, so
+`worker/index.ts` routes to them directly rather than keeping a Pages-era build
+step alive. It is also now inside `tsconfig.json`'s `include`, which `functions/`
+never was — those handlers were never typechecked at all.
+
+Build settings, because the client is a subdirectory of this repo:
 
 | Setting | Value |
 |---|---|
-| Root directory | `web` |
+| Root directory | `web` — no leading slash |
 | Build command | `pnpm build` |
-| Output directory | `dist` |
+| Deploy command | `pnpx wrangler deploy` |
 
-`web/` has its own `pnpm-lock.yaml` and `pnpm-workspace.yaml`, so Pages detects
-pnpm without help. `pnpm build` runs `tsc --noEmit` first, which makes a type
-error a failed deploy rather than a broken page.
+`pnpm build` runs `tsc --noEmit` first, so a type error is a failed deploy rather
+than a broken page. The output directory is not a dashboard setting here; it comes
+from `assets.directory` in `wrangler.jsonc`.
 
-Then the same keys the dev proxy reads, as **environment variables on the
-project** — `GRAPH_API_KEY`, `GRAPH_STUDIO_BASE`, `UNISWAP_API_KEY` and
-`TOKEN_API_JWT` if one has been issued. Mark the two keys and the JWT as secrets.
-They must not be `VITE_`-prefixed; that would inline them into the bundle, which
-is the whole thing the proxy exists to prevent.
+Then the same keys the dev proxy reads, as **Workers secrets / environment
+variables on the service** — `GRAPH_API_KEY`, `GRAPH_STUDIO_BASE`,
+`UNISWAP_API_KEY`, and `TOKEN_API_JWT` if one has been issued. None may be
+`VITE_`-prefixed; that would inline them into the browser bundle, which is the
+whole thing the proxy exists to prevent.
 
-**Connecting the repo has to be done in the dashboard.** Workers & Pages →
-Create → Pages → Connect to Git. Neither the REST API nor
-`wrangler pages project create` can do it, because it needs the Cloudflare GitHub
-App authorized against the repo owner, and that is an interactive OAuth grant. Once
-connected, every push to `main` deploys and every PR gets a preview.
+**Connecting the repo has to be done in the dashboard**, because it needs the
+Cloudflare GitHub App authorized against the repo owner — an interactive OAuth
+grant on github.com that no Cloudflare token, API call, or wrangler command can
+perform. Once connected, every push to `main` builds and deploys.
 
-### Two things that only showed up under workerd
-
-Both found by `wrangler pages dev dist`, and neither is visible from reading the
-code — worth running before trusting a deploy:
+### Run it under workerd before trusting a deploy
 
 ```shell
 pnpm build
 grep -vE '^\s*(#|$)' .env | grep -vE '^VITE_' > .dev.vars   # bindings, gitignored
-pnpm exec wrangler pages dev dist --compatibility-date=2026-04-28
+pnpm exec wrangler dev
 ```
 
-**There is no `_redirects` file, on purpose.** The usual SPA rule —
-`/*  /index.html  200` — is *rejected* by Pages: "Infinite loop detected in this
-rule and has been ignored", leaving "0 valid redirect rules". It would have looked
-fine in dev and 404'd every deep link in production. It is also unnecessary, since
-Pages already serves the shell for unmatched paths when there is no `404.html`;
-`/book`, `/orders` and `/offers` all return it.
+This reads `wrangler.jsonc`, so it exercises the real routing rather than an
+approximation of it — the asset worker, `run_worker_first`, and the SPA fallback
+all behave as deployed. Three things it has caught that reading the code did not:
 
-**Pin a compatibility date the local wrangler actually supports.** A date newer
-than the pinned binary fails to boot with "newest date supported by this server
-binary is …". The deployed runtime is current and takes the project default; only
-local runs need the older flag.
+**`run_worker_first` has to be scoped, not `true`.** With `true`, the Worker
+answers every request and `not_found_handling` never gets the chance to serve the
+shell, so every client-routed deep link 404s.
 
-`public/_routes.json` restricts Functions to `/api/*`, so static assets are served
-directly rather than invoking a Worker per request.
+**Pin a compatibility date the local wrangler supports.** A date newer than the
+binary running it refuses to boot — "the newest date supported by this server
+binary is …". The deployed edge is current, so an older date that both accept
+keeps one config working in both places.
 
----
+**Pages rejects the usual SPA `_redirects` rule outright.** Worth knowing if
+anything here ever moves back: `/*  /index.html  200` produces "Infinite loop
+detected in this rule and has been ignored", leaving "0 valid redirect rules" —
+fine in dev, 404 on every deep link in production. Workers supports `_redirects`
+natively, but `not_found_handling` covers the SPA case, so there is no such file.
 
 ## Uniswap: why exact-**output**
 

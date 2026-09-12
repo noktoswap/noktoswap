@@ -1,3 +1,14 @@
+# A single-package root, stated explicitly.
+#
+# This file existed only for `allowBuilds` below, with no `packages` key, and
+# Cloudflare's build image failed on it: "packages field missing or empty".
+# Local pnpm 11 tolerates the omission and so do pnpm 10.11.1 and `pnpm -r`
+# when reproduced against a clean clone, so the exact trigger is something in
+# that build environment. Naming it costs nothing, is true either way, and
+# removes the only construct the error refers to.
+packages:
+  - .
+
 # pnpm 11 reads build-script policy from here rather than from package.json.
 #
 # esbuild needs its postinstall to place the platform binary Vite compiles with.

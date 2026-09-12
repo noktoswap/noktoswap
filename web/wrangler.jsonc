@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+
+  // Must match the existing Worker service, or a deploy creates a second one.
+  "name": "xmrp2p",
+
+  /*
+   * Older than "today's date", on purpose. A compatibility date newer than the
+   * wrangler binary running it refuses to boot — "the newest date supported by
+   * this server binary is …" — which breaks local `wrangler dev` while the
+   * deployed runtime is fine. This Worker uses nothing but fetch, Request and
+   * Response, so there is no behaviour here that a newer date would change, and
+   * a date both the pinned local wrangler and the edge accept means the same
+   * config runs in both places without a flag.
+   */
+  "compatibility_date": "2026-04-28",
+
+  "main": "./worker/index.ts",
+
+  "assets": {
+    "directory": "./dist",
+
+    /*
+     * Pages served the app shell for unmatched paths implicitly, as long as no
+     * 404.html existed. Workers makes it explicit, and it is required: without
+     * it every client-routed deep link — /book, /orders, /offers — is a 404,
+     * which is invisible in development because the dev server has its own
+     * history fallback.
+     */
+    "not_found_handling": "single-page-application",
+
+    /*
+     * The replacement for `public/_routes.json`, which Workers does not read.
+     * Only these paths wake the Worker; everything else is served straight from
+     * the asset worker. It also has to be scoped rather than `true`, because
+     * `not_found_handling` above would otherwise never get the chance to serve
+     * the shell — the Worker would answer first and 404 every route.
+     */
+    "run_worker_first": ["/api/*"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
