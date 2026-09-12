@@ -375,9 +375,13 @@ nothing.
 | `/api/token` | `api.pinax.network` | `Authorization: Bearer $TOKEN_API_JWT` |
 | `/api/uniswap` | `trade-api.gateway.uniswap.org` | `x-api-key: $UNISWAP_API_KEY` |
 
-**Deploying means standing up the same three rewrites as edge functions.** They
-are three header injections and a path rewrite each; the client code needs no
-change, since it only ever talks to `/api/*`.
+**Deploying means standing up the same three rewrites as edge functions**, which
+`functions/` does — one handler per route, mirroring `vite.config.ts`. The client
+code needs no change, since it only ever talks to `/api/*`. If you change one,
+change both: a drift means the app works in development and 404s in production.
+
+See [Deploying to Cloudflare Pages](#deploying-to-cloudflare-pages) for the
+settings and the two things `wrangler pages dev` caught that reasoning did not.
 
 Two upstream facts worth knowing, both discovered the hard way:
 
@@ -387,6 +391,62 @@ Two upstream facts worth knowing, both discovered the hard way:
   the contract is deployed, "Your tokens" is genuinely unavailable on the home
   chain. `coversChain()` exists so the UI can say that rather than render an
   empty list that reads as a broken fetch.
+
+---
+
+## Deploying to Cloudflare Pages
+
+The build is a static bundle plus `functions/`, which Pages picks up
+automatically and runs on the edge. Three settings, because the client is a
+subdirectory of this repo:
+
+| Setting | Value |
+|---|---|
+| Root directory | `web` |
+| Build command | `pnpm build` |
+| Output directory | `dist` |
+
+`web/` has its own `pnpm-lock.yaml` and `pnpm-workspace.yaml`, so Pages detects
+pnpm without help. `pnpm build` runs `tsc --noEmit` first, which makes a type
+error a failed deploy rather than a broken page.
+
+Then the same keys the dev proxy reads, as **environment variables on the
+project** — `GRAPH_API_KEY`, `GRAPH_STUDIO_BASE`, `UNISWAP_API_KEY` and
+`TOKEN_API_JWT` if one has been issued. Mark the two keys and the JWT as secrets.
+They must not be `VITE_`-prefixed; that would inline them into the bundle, which
+is the whole thing the proxy exists to prevent.
+
+**Connecting the repo has to be done in the dashboard.** Workers & Pages →
+Create → Pages → Connect to Git. Neither the REST API nor
+`wrangler pages project create` can do it, because it needs the Cloudflare GitHub
+App authorized against the repo owner, and that is an interactive OAuth grant. Once
+connected, every push to `main` deploys and every PR gets a preview.
+
+### Two things that only showed up under workerd
+
+Both found by `wrangler pages dev dist`, and neither is visible from reading the
+code — worth running before trusting a deploy:
+
+```shell
+pnpm build
+grep -vE '^\s*(#|$)' .env | grep -vE '^VITE_' > .dev.vars   # bindings, gitignored
+pnpm exec wrangler pages dev dist --compatibility-date=2026-04-28
+```
+
+**There is no `_redirects` file, on purpose.** The usual SPA rule —
+`/*  /index.html  200` — is *rejected* by Pages: "Infinite loop detected in this
+rule and has been ignored", leaving "0 valid redirect rules". It would have looked
+fine in dev and 404'd every deep link in production. It is also unnecessary, since
+Pages already serves the shell for unmatched paths when there is no `404.html`;
+`/book`, `/orders` and `/offers` all return it.
+
+**Pin a compatibility date the local wrangler actually supports.** A date newer
+than the pinned binary fails to boot with "newest date supported by this server
+binary is …". The deployed runtime is current and takes the project default; only
+local runs need the older flag.
+
+`public/_routes.json` restricts Functions to `/api/*`, so static assets are served
+directly rather than invoking a Worker per request.
 
 ---
 
