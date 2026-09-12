@@ -65,14 +65,14 @@ export const OfferRow = (props: {
         <span class="cap2">
           {shortAddress(offer().owner)}
           <Show when={settled() !== null}> · {settled()} done</Show> ·{' '}
-          {chainLabel(app.homeChainId)} · posted {relativeTime(offer().createdAt, app.now() * 1000)}
+          {chainLabel(offer().chainId)} · posted {relativeTime(offer().createdAt, app.now() * 1000)}
         </span>
         <span style={{ 'margin-left': 'auto', display: 'flex', gap: '8px' }}>
-          <button class="btn-inline" onClick={() => openOrder(offer().offerId)}>
+          <button class="btn-inline" onClick={() => openOrder(offer().chainId, offer().offerId)}>
             Look at it
           </button>
           <Show when={!mine()}>
-            <button class="btn-inline btn-fill" onClick={() => openOrder(offer().offerId)}>
+            <button class="btn-inline btn-fill" onClick={() => openOrder(offer().chainId, offer().offerId)}>
               Take this offer
             </button>
           </Show>
@@ -103,7 +103,7 @@ export const OfferPhoneCard = (props: { offer: Offer }): JSX.Element => {
       class="offer"
       classList={{ 'offer-best': mine() }}
       style={{ gap: '6px' }}
-      onClick={() => openOrder(props.offer.offerId)}
+      onClick={() => openOrder(props.offer.chainId, props.offer.offerId)}
     >
       <div style={{ display: 'flex', 'align-items': 'center', gap: '8px', width: '100%' }}>
         <span style={{ 'font-size': '16px' }}>
@@ -123,7 +123,7 @@ export const OfferPhoneCard = (props: { offer: Offer }): JSX.Element => {
       </div>
       <span class="cap2" style={{ 'text-align': 'left' }}>
         {shortAddress(props.offer.owner)}
-        <Show when={settled() !== null}> · {settled()} done</Show> · {chainLabel(app.homeChainId)} ·{' '}
+        <Show when={settled() !== null}> · {settled()} done</Show> · {chainLabel(props.offer.chainId)} ·{' '}
         {relativeTime(props.offer.createdAt, app.now() * 1000)}
       </span>
     </button>

@@ -17,7 +17,11 @@ import { Find } from './routes/Find'
 import { Orders } from './routes/Orders'
 import { Results } from './routes/Results'
 import { nativeOf } from './lib/tokens'
+import { CHAINS } from './lib/chains'
 import { clearTokenNetworks, toggleTokenNetwork, tokenNetworks } from './state/filters'
+
+/** Derived, so adding a chain does not silently fail an unrelated assertion. */
+const CHAIN_COUNT = CHAINS.length
 import { draftEth, setDirectionTo, setDraftEth, setDraftXmr, setPayInput } from './state/swap'
 import { config } from './lib/wagmi'
 import { AppProvider } from './state/app'
@@ -102,9 +106,7 @@ describe('the screens mount with no data', () => {
     // network stubbed out, the line says the feed is unreachable rather than
     // dead-ending on a dash with no explanation.
     expect(screen.getByText(/XMR per ETH/)).toBeInTheDocument()
-    expect(
-      screen.getByText(/reading the market rate|price feed is unreachable/),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/the feed is unreachable/)).toBeInTheDocument()
   })
 
   it('takes input on the pay side in either direction', async () => {
@@ -283,16 +285,21 @@ describe('the currency picker', () => {
     expect(screen.getByText('Popular')).toBeInTheDocument()
   })
 
-  it('says plainly which chains have no contract', () => {
+  it('tells a missing contract apart from a missing indexer', () => {
     mount(() => <ChainPicker target="token-networks" />)
-    // "All chains" is a checkbox now, not a button — it is a filter state.
+    // "All chains" is a checkbox, not a button — it is a filter state.
     expect(screen.getByRole('checkbox', { name: 'All chains' })).toBeInTheDocument()
     expect(screen.getByText('Sepolia')).toBeInTheDocument()
-    // Four of the five chains have no deployment; none of them fake an open count.
-    expect(screen.getAllByText('not deployed').length).toBe(4)
+
+    // Arbitrum and Optimism have no contract. Mainnet, Base and Base Sepolia do,
+    // and reporting "0 open" for them would be a claim about the market rather
+    // than about our coverage — so they say which it is.
+    expect(screen.getAllByText('not deployed').length).toBe(2)
+    expect(screen.getAllByText(/book not indexed/).length).toBeGreaterThan(0)
+
     // With no wallet there is no balance to read, and an unread balance shows as
-    // a dash rather than as a zero that would read as a real figure.
-    expect(screen.getAllByText('—').length).toBe(5)
+    // a dash rather than a zero that would read as a real figure.
+    expect(screen.getAllByText('—').length).toBe(CHAIN_COUNT)
   })
 
   it('is multi-select, the way the wireframe checkboxes imply', async () => {
@@ -301,7 +308,7 @@ describe('the currency picker', () => {
 
     // Real checkboxes, from Kobalte — six inputs, not buttons wearing a square.
     const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
-    expect(boxes.length).toBe(6) // All chains, plus the five networks
+    expect(boxes.length).toBe(CHAIN_COUNT + 1) // every chain, plus "All chains"
 
     // Empty filter means "all", so only that row is ticked to begin with.
     expect(boxes[0]?.checked).toBe(true)

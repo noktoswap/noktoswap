@@ -140,7 +140,8 @@ export const SwapWidget = (): JSX.Element => {
     if (match.verdict === 'exact' && match.best) {
       return (
         <>
-          {shortAddress(match.best.offer.owner)} · {chainLabel(app.homeChainId)} · your exact size
+          {shortAddress(match.best.offer.owner)} · {chainLabel(match.best.offer.chainId)} · your
+          exact size
         </>
       )
     }
@@ -148,31 +149,43 @@ export const SwapWidget = (): JSX.Element => {
       return (
         <>
           nothing at your exact size · closest is{' '}
-          {formatLeg(legAmount(match.best.offer, payLeg()), payLeg())} {unit}
+          {formatLeg(legAmount(match.best.offer, payLeg()), payLeg())} {unit} on{' '}
+          {chainLabel(match.best.offer.chainId)}
         </>
       )
     }
-    // NOTHING. Prefer the book's own going rate across every open offer — the
-    // number you would price against if you posted one. Only when the book
-    // cannot answer at all does the line name an external feed, because where
-    // a rate came from changes how much it is worth trusting.
+    /*
+     * NOTHING takeable. Prefer the book's own going rate — the number you would
+     * price against if you posted one — but only when the book actually has one:
+     * `bookRate` returns null on a thin or implausible book, so a single test
+     * offer can no longer be quoted as the market.
+     *
+     * Whichever source answers, the line names it *and* the chain. The book spans
+     * chains now, and "biggest open is 0.0001 ETH" with no chain reads as a claim
+     * about the reader's own network when the offer is on another one entirely.
+     */
     return (
       <Show
-        when={closest}
+        when={app.rateSource() === 'book' && closest}
         fallback={
           <Show
             when={app.oracleRate() !== null}
-            fallback={<>no offers, and the price feed is unreachable</>}
+            fallback={<>no rate available — the book is thin and the feed is unreachable</>}
           >
             market price · Chainlink on {FEED_NETWORK_LABEL}
             <Show when={app.rateStale()}> · last round is stale</Show>
+            <Show when={app.openCount() > 0}>
+              {' '}
+              · {plural(app.openCount(), 'offer')} on the book, too few to price from
+            </Show>
           </Show>
         }
       >
         {(offer) => (
           <>
             the book&rsquo;s going rate · biggest open is{' '}
-            {formatLeg(legAmount(offer(), payLeg()), payLeg())} {unit}
+            {formatLeg(legAmount(offer(), payLeg()), payLeg())} {unit} on{' '}
+            {chainLabel(offer().chainId)}
           </>
         )}
       </Show>
@@ -192,8 +205,8 @@ export const SwapWidget = (): JSX.Element => {
   const primary = createMemo(() => {
     const match = matching()
     if (match.verdict === 'exact' && match.best) {
-      const offerId = match.best.offer.offerId
-      return { label: 'Take this offer', action: () => openOrder(offerId) }
+      const { chainId, offerId } = match.best.offer
+      return { label: 'Take this offer', action: () => openOrder(chainId, offerId) }
     }
     // Nothing typed yet: the book is unfiltered, so offer to browse it rather
     // than reporting "0 near offers" — there is nothing to be near to.
@@ -399,7 +412,7 @@ export const SwapWidget = (): JSX.Element => {
             when={app.bookError()}
             fallback={
               <a class="link" href="/book" onClick={(e) => (e.preventDefault(), navigate('/book'))}>
-                browse all {app.openCount()} offers
+                browse all {plural(app.openCount(), 'offer')}
               </a>
             }
           >

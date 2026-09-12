@@ -64,6 +64,7 @@ the app.
 ## Day 1 (Wed 9th) — unblock and de-risk
 
 - [ ] **Ask ETHGlobal about the composability track's continuity eligibility.**
+      ⬅ still open, and still worth $5,000.
       Everything downstream depends on it. Ask before writing code.
 - [ ] `CONTINUITY.md` — what existed before (upstream client, v1.1 contracts,
       Lo-Fi designs) versus what's built during the event. Required by both
@@ -96,11 +97,17 @@ the app.
 Composition requires **2+ Graph products**. Two paths, and the cheap one is the
 baseline:
 
-- [~] **Baseline — Subgraph + Token API.** Subgraph half is **done and live**
-      (Day 1). Token API is one REST call in the frontend and lands with Day 3.
-      Once both are in, the entry qualifies on product count alone.
-- [ ] **Seed the book.** `nextOfferId` is 1 — the subgraph currently returns an
-      empty `offers` list, which is a weak thing to demo. Needs offers in both
+- [x] **Baseline — Subgraph + Token API.** Both live and wired. Stronger than
+      planned: the subgraph half is now **three** deployments —
+      `xmrp-2-p` (Sepolia), `noktoswap-mainnet`, `noktoswap-base` — each synced
+      with no indexing errors, all reporting identical market parameters from the
+      constructor's `ParametersUpdated`. A manifest targets exactly one network,
+      so three chains means three subgraphs merged client-side; `subgraph/deploy.sh`
+      builds all of them from one manifest via `networks.json`.
+- [~] **Seed the book.** One offer live on Sepolia (`nextOfferId` is 2); mainnet
+      and Base still empty. Note the knock-on: the widget needs 3+ open offers
+      before it will quote a book rate rather than Chainlink, so a demo that wants
+      to show "the book's going rate" needs three. Needs offers in both
       directions and at least one walked through to `CLAIMED`, which means
       generating canonical ed25519 points (the deployer script has commented-out
       scaffolding using `Ed25519.scalarMultBase`).
@@ -155,11 +162,25 @@ See [`web/README.md`](web/README.md).
       landing screen shows a real number instead of a dash. Note for the demo:
       **the mainnet XMR/USD feed is decommissioned** — it reverts, and
       `xmr-usd.data.eth` still points at it. The live pair is on Optimism.
-- [ ] `FEEDBACK.md`. The material is ready and sharper than expected — the swap
+- [x] `FEEDBACK.md`. Written, then **fact-checked against the OpenAPI document**
+      rather than the prose docs, which corrected three claims that would not have
+      survived a Uniswap engineer reading them: `/quote` *does* take a `recipient`;
+      `/swap_5792` *does* offer an atomicity path; and the widgets package *is*
+      deprecated on npm. Each item is sharper for it — the composition gap is now
+      "the answer exists and is invisible from the documented flow" rather than
+      "the API cannot do this".
+- [ ] ~~`FEEDBACK.md`~~ superseded above. The material is ready and sharper than expected — the swap
       and the escrow **cannot** be one transaction (the Trading API pays the
       swapper, and there is no hook), so funding an escrow is irreducibly a
       two-transaction sequence. Plus Permit2 being required on some routes and
       not others, with no way to ask in advance.
+
+**Also landed, unplanned:** multi-chain throughout. Offers are keyed by
+`(chainId, offerId)` because ids restart at 1 per deployment; testnet and mainnet
+books never merge, since a Sepolia offer carries a stagenet Monero escrow; and the
+money paths were diffed against upstream's client, which caught a real bug — an
+OPEN offer's `counterparty` is a *restriction*, not a party, so reserved offers
+were showing a Cancel button to the taker and a Take button to everyone else.
 
 **Exit:** ⚠️ a user holding no ETH can quote and fund, but cannot yet take —
 `take` needs a seeded book, and paying in a token needs Permit2 signing on routes

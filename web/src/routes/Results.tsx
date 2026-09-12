@@ -3,7 +3,7 @@ import { For, Show, createMemo, type JSX } from 'solid-js'
 import { Footer, Nav } from '../components/Nav'
 import { OfferRow } from '../components/OfferCard'
 import { WaitingOnYou } from '../components/WaitingOnYou'
-import { HOME_CHAIN } from '../lib/chains'
+
 import { formatEth, formatXmr, plural } from '../lib/format'
 import { matchOffers, receiveAmountFor, type Leg, type Match } from '../lib/offers'
 import { useApp } from '../state/app'
@@ -234,7 +234,7 @@ export const Results = (): JSX.Element => {
         </div>
       </div>
 
-      <Footer contract={HOME_CHAIN.deployment ?? undefined} explorer={HOME_CHAIN.explorer} />
+      <Footer chainId={app.actionChainId()} />
     </div>
   )
 }

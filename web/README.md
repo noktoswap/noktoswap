@@ -1,7 +1,7 @@
 # Noktoswap web client
 
 SolidJS + wagmi front end for the ETH ↔ XMR offer book. Reads the book from the
-live subgraph, reads every figure that gates a payment from the contract, and
+live subgraphs, reads every figure that gates a payment from the contract, and
 funds escrows through the Uniswap Trading API.
 
 ```shell
@@ -513,11 +513,68 @@ signature is required; `SwapReview` detects that and refuses rather than sending
 a transaction that would fail at simulation. Routes that need only a plain router
 approval work today.
 
-**The book is empty.** `nextOfferId` is 1 on the Sepolia deployment, so every
-list renders its empty state. That is a seeding task, not a client one — see
-`PLAN.md`.
+**The book is nearly empty.** One offer on Sepolia; mainnet and Base have none
+yet. Seeding is a task, not a client gap — see `PLAN.md`. Note the knock-on: with
+fewer than `MIN_BOOK_SAMPLE` offers the widget will not quote a book rate and
+falls back to Chainlink, saying so.
+
+**Same-block quit is not gated.** The contract rejects an EVM-side quit on a SELL
+offer in the block it was taken (`ErrorSellOfferCannotQuitInTakenBlock`); upstream
+checks `blockNumber > blockTaken` before enabling the action and this client does
+not. Since every write simulates first, it surfaces as that decoded error rather
+than a loss.
 
 ---
+
+## Three chains, two realms
+
+The book spans every indexed chain — one subgraph each, merged in
+`lib/subgraph.ts`. Three things that merge forces, each of which was a real bug
+before it was a rule:
+
+**An offer is `(chainId, offerId)`, never an id.** Ids restart at 1 on every
+deployment, so offer #1 exists on all three chains. Dedupe keys, the order dialog,
+contract reads and writes all take the pair — resolving a chain globally meant
+opening one chain's order and signing against another's.
+
+**Test money and real money are different markets.** The design's "one book, not
+four" means Ethereum/Optimism/Arbitrum/Base — mainnets one wallet prompt apart.
+Sepolia is here because it is where the contract landed first, and merging it into
+a mainnet book put play money beside real money. Worse, the Monero network is
+paired to the chain, so a Sepolia offer carries a *stagenet* escrow address. The
+book is filtered by realm at the query, and a test asserts
+`moneroMainnet === (realm === 'mainnet')` for every chain so the two cannot drift.
+Own orders are deliberately exempt: a trade you are party to has a clock running
+whichever chain it is on.
+
+**A median of one offer is that offer.** `bookGoingRate` needs
+`MIN_BOOK_SAMPLE` (3) open offers before the book gets to set a rate, and
+cross-checks the median against Chainlink — more than `IMPLAUSIBLE_FACTOR` adrift
+is a mispriced book, not a market that disagrees. Both guards return null so the
+caller reaches for the feed. A single test offer priced ~100× off was being shown
+as "the book's going rate".
+
+## Checked against upstream
+
+The money paths were compared line by line against
+[`v3xlabs/xmrp2p`](https://github.com/v3xlabs/xmrp2p)'s client, which runs against
+the same contract. `keysForTake`, `keysForOpen`, `requiredToTake`, the `claim` and
+`quit` arguments, the EVM-side quit window and the SELL `msg.value` derivation all
+agree.
+
+It found one bug here. Upstream gates Take on
+`counterparty === 0x0 || counterparty === me`, mirroring the contract's
+`ErrorNonMember`. On an **OPEN** offer `counterparty` is a *restriction* — the one
+address allowed to take it — not a party; `take` is what promotes it to a party by
+overwriting the field with the taker. Reading it as a party broke both ways: an
+offer reserved *for* you showed the maker's Cancel button, and one reserved for
+someone else showed Take. Both reverted. `sideOf` and `canTake` now mirror the
+contract.
+
+Two differences are deliberate. Upstream floors the SELL deposit derivation; this
+rounds up, because flooring can derive an offer fractionally smaller than the maker
+asked for. And upstream requires a non-zero view key to enable a quit simulation
+where this passes `0n` for the XMR side — the contract's XMR branch never reads it.
 
 ## Layout
 

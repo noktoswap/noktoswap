@@ -138,7 +138,7 @@ export const SwapReview = (): JSX.Element => {
       queryKey: ['review-quote', address, required?.toString(), who, maxSlippage()],
       queryFn: (): Promise<FundingQuote> =>
         quoteFunding({
-          chainId: app.homeChainId,
+          chainId: app.actionChainId(),
           token: address as `0x${string}`,
           ethRequired: required as bigint,
           swapper: who as `0x${string}`,
@@ -158,7 +158,7 @@ export const SwapReview = (): JSX.Element => {
       queryKey: ['review-approval', address, ceiling?.toString(), who],
       queryFn: () =>
         checkApproval({
-          chainId: app.homeChainId,
+          chainId: app.actionChainId(),
           walletAddress: who as `0x${string}`,
           token: address as `0x${string}`,
           // Approve against the ceiling, not the expected spend — otherwise the
@@ -189,9 +189,9 @@ export const SwapReview = (): JSX.Element => {
       to: request.to,
       data: request.data,
       value: BigInt(request.value || '0'),
-      chainId: app.homeChainId,
+      chainId: app.actionChainId(),
     })
-    return waitForTransactionReceipt(config, { hash, chainId: app.homeChainId })
+    return waitForTransactionReceipt(config, { hash, chainId: app.actionChainId() })
   }
 
   const execute = async () => {
@@ -210,8 +210,8 @@ export const SwapReview = (): JSX.Element => {
     setError(null)
     setBusy(true)
     try {
-      if (app.walletChainId() !== app.homeChainId) {
-        await switchChain(config, { chainId: app.homeChainId })
+      if (app.walletChainId() !== app.actionChainId()) {
+        await switchChain(config, { chainId: app.actionChainId() })
       }
 
       let index = 0
@@ -246,12 +246,12 @@ export const SwapReview = (): JSX.Element => {
       // Only now does the wallet hold escrowable ETH.
       const pair = generateCanonicalKeypair()
       const ref = `draft-${Date.now()}`
-      saveKeypair(app.homeChainId, ref, pair)
+      saveKeypair(app.actionChainId(), ref, pair)
       setBackup(exportKeypair(pair, 'a new offer'))
 
       const { spendingKey, viewingKey } = keysForOpen(kind(), pair)
       const hash = await openOffer({
-        chainId: app.homeChainId,
+        chainId: app.actionChainId(),
         kind: kind(),
         xmrAmount: xmr,
         counterparty: '0x0000000000000000000000000000000000000000',
@@ -259,7 +259,7 @@ export const SwapReview = (): JSX.Element => {
         viewingKey,
         value,
       })
-      const receipt = await waitForTransactionReceipt(config, { hash, chainId: app.homeChainId })
+      const receipt = await waitForTransactionReceipt(config, { hash, chainId: app.actionChainId() })
 
       /*
        * Read the new id out of the receipt rather than waiting for the subgraph.
@@ -273,7 +273,7 @@ export const SwapReview = (): JSX.Element => {
         setOfferId(newId)
         // Re-key the escrow keys from the draft reference onto the real id, or
         // nothing could find them again.
-        rekeyKeypair(app.homeChainId, ref, `offer-${newId.toString()}`)
+        rekeyKeypair(app.actionChainId(), ref, `offer-${newId.toString()}`)
       }
 
       setStep(++index)
@@ -299,7 +299,7 @@ export const SwapReview = (): JSX.Element => {
     >
       <Show when={needsSwap()}>
         <Leg
-          label={`You pay · ${chainLabel(app.homeChainId)}`}
+          label={`You pay · ${chainLabel(app.actionChainId())}`}
           amount={`${formatToken(funding.data?.tokenIn ?? 0n, token().decimals)} ${token().symbol}`}
           currency={token()}
         />
@@ -309,9 +309,9 @@ export const SwapReview = (): JSX.Element => {
       </Show>
 
       <Leg
-        label={`Locked in your order · ${chainLabel(app.homeChainId)}`}
+        label={`Locked in your order · ${chainLabel(app.actionChainId())}`}
         amount={`${formatEth(escrowValue() ?? 0n)} ETH`}
-        currency={nativeOf(app.homeChainId)}
+        currency={nativeOf(app.actionChainId())}
       />
 
       <div style={{ display: 'flex', 'justify-content': 'center', margin: '-4px 0' }}>
@@ -432,7 +432,7 @@ export const SwapReview = (): JSX.Element => {
               // Open the order itself on top of the list. It reads the contract,
               // so it is right immediately, while the book behind it fills in on
               // its next poll.
-              if (id !== null) openOrder(id)
+              if (id !== null) openOrder(app.actionChainId(), id)
             }}
           >
             <Show when={offerId()} fallback="Done — see it on the book">

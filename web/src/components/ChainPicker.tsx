@@ -114,9 +114,20 @@ export const ChainPicker = (props: { target: ChainFilterTarget }): JSX.Element =
     }
   })
 
-  /** Open offers per chain. Only the home chain has a book to count. */
-  const openOn = (chainId: number): number | null =>
-    chainId === app.homeChainId ? app.openCount() : null
+  /**
+   * Three distinct facts, and the row has to tell them apart:
+   *   a count      — deployed and indexed, so the book is knowable
+   *   'unindexed'  — deployed, but this app cannot list its offers
+   *   'absent'     — no contract at all
+   *
+   * Reporting "0 open" for an unindexed chain would be a claim about the market
+   * rather than about our coverage.
+   */
+  const bookOn = (info: (typeof CHAINS)[number]): number | 'unindexed' | 'absent' => {
+    if (info.deployment === null) return 'absent'
+    if (info.subgraph === null) return 'unindexed'
+    return app.openCount()
+  }
 
   return (
     <Modal title="Chains" width={422}>
@@ -137,7 +148,7 @@ export const ChainPicker = (props: { target: ChainFilterTarget }): JSX.Element =
         <For each={CHAINS}>
           {(info) => {
             const balance = () => balances.data?.get(info.chain.id) ?? null
-            const open = () => openOn(info.chain.id)
+            const book = () => bookOn(info)
             return (
               <Box
                 checked={selected().includes(info.chain.id)}
@@ -161,9 +172,11 @@ export const ChainPicker = (props: { target: ChainFilterTarget }): JSX.Element =
                       </Show>
                     </span>
                     <span class="cap2" style={{ 'font-size': '12.5px' }}>
-                      <Show when={open() !== null} fallback={<>not deployed</>}>
-                        {open()} open
-                      </Show>
+                      {book() === 'absent'
+                        ? 'not deployed'
+                        : book() === 'unindexed'
+                          ? 'live · book not indexed'
+                          : `${book()} open`}
                     </span>
                   </span>
                 }
@@ -174,8 +187,9 @@ export const ChainPicker = (props: { target: ChainFilterTarget }): JSX.Element =
       </div>
 
       <span class="cap" style={{ 'padding-top': '4px' }}>
-        Offers live on the chain they were opened on. Every chain here is routable by the Uniswap
-        Trading API; UniswapX fills only on Ethereum, Arbitrum and Base.
+        Offers live on the chain they were opened on. The contract is deployed at one address across
+        chains. Every chain here is routable by the Uniswap Trading API; UniswapX fills only on
+        Ethereum, Arbitrum and Base.
       </span>
 
       <button class="btn btn-primary" onClick={closeModal}>

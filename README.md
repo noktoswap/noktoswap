@@ -16,9 +16,21 @@ handing over the coins are the same action.
 | | |
 |---|---|
 | Contract | **`0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C`** on [mainnet](https://etherscan.io/address/0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C), [Base](https://basescan.org/address/0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C) and [Base Sepolia](https://sepolia.basescan.org/address/0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C) — one address, via CREATE3 |
-| Contract (Sepolia) | [`0x67DB37c3…`](https://sepolia.etherscan.io/address/0x67DB37c3be37B44c0506e5DF441437C83114bCd2) — block `11670176`, predates CREATE3, **what the subgraph indexes** |
-| Subgraph | [`xmrp-2-p`](https://thegraph.com/studio/subgraph/xmrp-2-p) on Subgraph Studio |
-| Query | `https://api.studio.thegraph.com/query/5944/xmrp-2-p/version/latest` |
+| Contract (Sepolia) | [`0x67DB37c3…`](https://sepolia.etherscan.io/address/0x67DB37c3be37B44c0506e5DF441437C83114bCd2) — block `11670176`, predates CREATE3 |
+
+**Subgraphs — one per chain.** A manifest targets exactly one network, so
+indexing three chains is three deployments and three query URLs, merged in the
+client ([`web/src/lib/subgraph.ts`](web/src/lib/subgraph.ts)):
+
+| Chain | Studio | Query |
+|---|---|---|
+| Sepolia | [`xmrp-2-p`](https://thegraph.com/studio/subgraph/xmrp-2-p) | `…/query/5944/xmrp-2-p/version/latest` |
+| Ethereum | [`noktoswap-mainnet`](https://thegraph.com/studio/subgraph/noktoswap-mainnet) | `…/query/5944/noktoswap-mainnet/version/latest` |
+| Base | [`noktoswap-base`](https://thegraph.com/studio/subgraph/noktoswap-base) | `…/query/5944/noktoswap-base/version/latest` |
+
+Base Sepolia has a contract and no subgraph: readable and tradable by id, not
+browsable. `subgraph/deploy.sh` deploys all three from one manifest via
+`networks.json`.
 
 All three CREATE3 deployments report runtime codehash `0x87856a11…` — the same
 address *and* the same code. See [`contracts/README.md`](contracts/README.md) for
@@ -45,6 +57,14 @@ Two Graph products, doing different jobs:
 *n* offers without an indexer is *n* archive `eth_call`s. The subgraph turns the
 whole book into one GraphQL query — and the client's filtering, state tracking
 and counts fall out of it rather than being built.
+
+Across **three chains** that multiplies: the book is three subgraphs merged
+client-side, with failures isolated per chain so one unreachable indexer cannot
+empty the book or make a chain look like it has no offers. Two details the merge
+forces, both of which would be silent bugs without it — offer ids restart at 1 on
+every deployment, so an offer is keyed by `(chainId, offerId)` and never by id
+alone; and testnet and mainnet books are never merged, because a Sepolia offer
+carries a *stagenet* Monero escrow.
 
 Two things then need **no contract reads at all**, which is the sharper claim.
 `Account.withdrawable` is exactly `sum(PayoutCredit) - sum(AccountWithdrawal)` —

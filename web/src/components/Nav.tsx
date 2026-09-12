@@ -1,7 +1,7 @@
 import { A } from '@solidjs/router'
 import { Show, createSignal, type JSX } from 'solid-js'
 import { useConnection, useDisconnect, useSwitchChain } from '@wagmi/solid'
-import { CHAINS, chainLabel } from '../lib/chains'
+import { CHAINS, chainInfo, chainLabel } from '../lib/chains'
 import { shortAddress } from '../lib/format'
 import { useApp } from '../state/app'
 import { openConnect } from '../state/modals'
@@ -70,6 +70,9 @@ const ChainChip = (): JSX.Element => {
               <Show when={info.deployment === null}>
                 <span class="cap2">not deployed</span>
               </Show>
+              <Show when={info.deployment !== null && info.subgraph === null}>
+                <span class="cap2">not indexed</span>
+              </Show>
               <Show when={info.chain.id === app.walletChainId()}>
                 <span class="pill">on</span>
               </Show>
@@ -78,6 +81,20 @@ const ChainChip = (): JSX.Element => {
         </div>
       </Show>
     </div>
+  )
+}
+
+const RealmBadge = (): JSX.Element => {
+  const app = useApp()
+  return (
+    <Show when={app.realm() === 'testnet'}>
+      <span
+        class="pill"
+        title="Offers here are on a test network. Test money, and stagenet Monero."
+      >
+        testnet
+      </span>
+    </Show>
   )
 }
 
@@ -141,6 +158,13 @@ export const Nav = (): JSX.Element => (
     </A>
 
     <div style={{ display: 'flex', 'align-items': 'center', gap: '10px' }}>
+      {/*
+        Which market you are looking at, stated rather than inferred. The book is
+        realm-scoped, so a testnet offer never reaches a mainnet reader — but the
+        converse matters too: someone on Sepolia should know the prices they are
+        seeing are play money before they read anything into them.
+      */}
+      <RealmBadge />
       <span class="chip" style={{ padding: '7px 9px' }} aria-hidden="true">
         <Contrast />
       </span>
@@ -150,8 +174,14 @@ export const Nav = (): JSX.Element => (
   </header>
 )
 
-/** Source and contract links. Present on every page, quietly. */
-export const Footer = (props: { contract?: string; explorer?: string }): JSX.Element => (
+/**
+ * Source and contract links. Present on every page, quietly.
+ *
+ * Takes a chain rather than an address and an explorer: with three deployments the
+ * link has to follow whichever chain the reader is acting on, and resolving that
+ * here means a caller cannot pair one chain's address with another's explorer.
+ */
+export const Footer = (props: { chainId: number }): JSX.Element => (
   <footer
     style={{
       display: 'flex',
@@ -170,14 +200,14 @@ export const Footer = (props: { contract?: string; explorer?: string }): JSX.Ele
     >
       Source
     </a>
-    <Show when={props.contract && props.explorer}>
+    <Show when={chainInfo(props.chainId)?.deployment}>
       <a
-        href={`${props.explorer}/address/${props.contract}`}
+        href={`${chainInfo(props.chainId)?.explorer}/address/${chainInfo(props.chainId)?.deployment}`}
         target="_blank"
         rel="noreferrer"
         style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}
       >
-        Contract
+        Contract on {chainLabel(props.chainId)}
       </a>
     </Show>
   </footer>

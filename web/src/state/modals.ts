@@ -22,7 +22,12 @@ import type { Currency } from '../lib/tokens'
 export type ChainFilterTarget = 'token-networks' | 'book-chains'
 
 export type Modal =
-  | { kind: 'order'; offerId: bigint }
+  /**
+   * `chainId` is not optional context. Offer ids restart at 1 on every
+   * deployment, so #1 exists on all three chains — opening one by id alone would
+   * read whichever chain happened to be default and show a different trade.
+   */
+  | { kind: 'order'; chainId: number; offerId: bigint }
   | { kind: 'create' }
   | {
       kind: 'token'
@@ -51,8 +56,8 @@ const push = (next: Modal): void => {
   setStack((current) => [...current, next])
 }
 
-export const openOrder = (offerId: bigint): void => {
-  push({ kind: 'order', offerId })
+export const openOrder = (chainId: number, offerId: bigint): void => {
+  push({ kind: 'order', chainId, offerId })
 }
 export const openCreate = (): void => {
   push({ kind: 'create' })

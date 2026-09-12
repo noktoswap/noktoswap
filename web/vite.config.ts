@@ -22,12 +22,20 @@ export default defineConfig(({ mode }) => {
   // because anything VITE_ gets inlined into the client bundle.
   const env = loadEnv(mode, process.cwd(), '')
 
-  // The Studio query URL carries the subgraph path, but a proxy target's own
-  // path gets prepended to the rewritten one — so split it and use only the
-  // origin as the target.
-  const graphUrl = new URL(
-    env.GRAPH_QUERY_URL ?? 'https://api.studio.thegraph.com/query/5944/xmrp-2-p/version/latest',
+  /**
+   * One subgraph per chain, so one route per slug: `/api/graph/<slug>`.
+   *
+   * A subgraph targets exactly one network — every data source in a manifest must
+   * share it — so indexing three chains means three deployments and three query
+   * URLs. The slug is the only thing that varies, and it comes from the client's
+   * own chain registry, so this rewrite is a substitution rather than a mapping
+   * that could drift out of sync with it.
+   */
+  const studioBase = new URL(
+    env.GRAPH_STUDIO_BASE ?? 'https://api.studio.thegraph.com/query/5944',
   )
+  /** Slugs are `[a-z0-9-]`; anything else is not ours to forward. */
+  const SLUG = /^[a-z0-9-]{1,64}$/
 
   return {
     plugins: [solid()],
@@ -35,10 +43,18 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api/graph': {
-          ...upstream(graphUrl.origin, {
+          ...upstream(studioBase.origin, {
             Authorization: env.GRAPH_API_KEY && `Bearer ${env.GRAPH_API_KEY}`,
           }),
-          rewrite: () => graphUrl.pathname,
+          rewrite: (path) => {
+            const slug = path.replace(/^\/api\/graph\/?/, '').split(/[/?]/)[0] ?? ''
+            if (!SLUG.test(slug)) {
+              // Refuse rather than forward something shaped like a path traversal
+              // with the API key attached.
+              throw new Error(`refusing to proxy an unrecognised subgraph slug: ${slug}`)
+            }
+            return `${studioBase.pathname}/${slug}/version/latest`
+          },
         },
         '/api/token': {
           // token-api.thegraph.com no longer resolves; the service moved to Pinax.

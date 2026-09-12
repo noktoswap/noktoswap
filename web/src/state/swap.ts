@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { HOME_CHAIN } from '../lib/chains'
+import { DEFAULT_CHAIN } from '../lib/chains'
 import { XMR, isXmr, nativeOf, type Currency } from '../lib/tokens'
 import { otherLeg, type Leg, type OfferKind, type Want } from '../lib/offers'
 import { tryParseEth, tryParseXmr } from '../lib/format'
@@ -28,7 +28,7 @@ const [direction, setDirection] = createSignal<Direction>('eth-to-xmr')
  */
 const [payInput, setPayInput] = createSignal('')
 /** The EVM-side currency being paid or received. ETH means no swap is needed. */
-const [evmCurrency, setEvmCurrency] = createSignal<Currency>(nativeOf(HOME_CHAIN.chain.id))
+const [evmCurrency, setEvmCurrency] = createSignal<Currency>(nativeOf(DEFAULT_CHAIN.chain.id))
 
 /**
  * The offer being drafted. Lives here, not in the form, because Review is a

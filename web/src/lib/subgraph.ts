@@ -1,15 +1,25 @@
 import type { Address } from 'viem'
+import { indexedChains, type ChainInfo } from './chains'
 import type { Offer, OfferKind, OfferState } from './offers'
 
 /**
- * The offer book, read from the live subgraph on Subgraph Studio.
+ * The offer book, read from the live subgraphs on Subgraph Studio.
  *
- * Requests go through `/api/graph`, which the dev server rewrites onto the
- * Studio query URL with the API key attached — see vite.config.ts. Fixtures
- * disqualify the Graph entry, so there is deliberately no offline fallback
- * here: if the subgraph is unreachable the UI says so.
+ * **One subgraph per chain.** A manifest targets exactly one network — every data
+ * source in it must share one — so three indexed chains are three deployments with
+ * three query URLs, and the merge happens here rather than in the indexer.
+ *
+ * That is why every offer carries its own `chainId`: the subgraph cannot tell you,
+ * because it only knows the one chain it indexes. It is tagged on decode, from the
+ * chain whose endpoint answered. Anywhere the UI shows a global chain instead of
+ * `offer.chainId` is a bug — an offer never leaves the chain it was opened on.
+ *
+ * Requests go through `/api/graph/<slug>`, which the dev server rewrites onto
+ * Studio with the API key attached — see vite.config.ts. Fixtures disqualify the
+ * Graph entry, so there is deliberately no offline fallback: if a subgraph is
+ * unreachable the UI says so, per chain.
  */
-const ENDPOINT = '/api/graph'
+const endpointFor = (slug: string) => `/api/graph/${slug}`
 
 class SubgraphError extends Error {
   constructor(message: string) {
@@ -18,22 +28,26 @@ class SubgraphError extends Error {
   }
 }
 
-const query = async <T>(document: string, variables: Record<string, unknown> = {}): Promise<T> => {
-  const response = await fetch(ENDPOINT, {
+const query = async <T>(
+  slug: string,
+  document: string,
+  variables: Record<string, unknown> = {},
+): Promise<T> => {
+  const response = await fetch(endpointFor(slug), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: document, variables }),
   })
 
   if (!response.ok) {
-    throw new SubgraphError(`subgraph responded ${response.status} ${response.statusText}`)
+    throw new SubgraphError(`${slug} responded ${response.status} ${response.statusText}`)
   }
 
   const body = (await response.json()) as { data?: T; errors?: { message: string }[] }
   if (body.errors?.length) {
-    throw new SubgraphError(body.errors.map((e) => e.message).join('; '))
+    throw new SubgraphError(`${slug}: ${body.errors.map((e) => e.message).join('; ')}`)
   }
-  if (!body.data) throw new SubgraphError('subgraph returned no data')
+  if (!body.data) throw new SubgraphError(`${slug} returned no data`)
   return body.data
 }
 
@@ -74,7 +88,8 @@ type RawOffer = {
   updatedAt: string
 }
 
-const decode = (raw: RawOffer): Offer => ({
+const decode = (raw: RawOffer, chainId: number): Offer => ({
+  chainId,
   offerId: BigInt(raw.offerId),
   kind: raw.kind,
   state: raw.state,
@@ -93,71 +108,136 @@ const decode = (raw: RawOffer): Offer => ({
 
 export type OfferPage = {
   offers: Offer[]
-  /** Offers currently on the book, across every state-less filter. */
-  openCount: number
+  /** Offers on the book, per chain. Keyed by chain id. */
+  openByChain: Map<number, number>
+  /** Chains whose subgraph did not answer, so their absence means nothing. */
+  unreachable: { chainId: number; reason: string }[]
 }
 
-/**
- * The book. `states` defaults to OPEN because that is what "the book" means
- * everywhere in the UI except the order lists.
- */
-export const fetchOffers = async (options?: {
-  first?: number
-  skip?: number
-  states?: OfferState[]
-  kind?: OfferKind
-}): Promise<OfferPage> => {
+/** Total across the chains that answered. */
+export const totalOpen = (page: OfferPage): number =>
+  [...page.openByChain.values()].reduce((a, b) => a + b, 0)
+
+const offersOnChain = async (
+  info: ChainInfo,
+  options?: { first?: number; states?: OfferState[]; kind?: OfferKind },
+): Promise<{ offers: Offer[]; open: number }> => {
   const where: Record<string, unknown> = {}
   if (options?.states) where.state_in = options.states
   if (options?.kind) where.kind = options.kind
 
   const data = await query<{ offers: RawOffer[]; open: { id: string }[] }>(
-    `query Offers($first: Int!, $skip: Int!, $where: Offer_filter!) {
-      offers(first: $first, skip: $skip, where: $where, orderBy: createdAt, orderDirection: desc) {
+    info.subgraph as string,
+    `query Offers($first: Int!, $where: Offer_filter!) {
+      offers(first: $first, where: $where, orderBy: createdAt, orderDirection: desc) {
         ${OFFER_FIELDS}
       }
       open: offers(first: 1000, where: { state: OPEN }) { id }
     }`,
     {
       first: options?.first ?? 100,
-      skip: options?.skip ?? 0,
       where: Object.keys(where).length ? where : { state: 'OPEN' },
     },
   )
 
-  return { offers: data.offers.map(decode), openCount: data.open.length }
+  return {
+    offers: data.offers.map((raw) => decode(raw, info.chain.id)),
+    open: data.open.length,
+  }
+}
+
+/**
+ * The book, merged across every indexed chain.
+ *
+ * Failures are per chain and isolated: one unreachable subgraph must not empty the
+ * whole book, and it must not silently look like "no offers there" either — hence
+ * `unreachable`, so the UI can say which chain it cannot see rather than implying
+ * the market is empty.
+ */
+export const fetchOffers = async (options?: {
+  first?: number
+  states?: OfferState[]
+  kind?: OfferKind
+  /** Restrict to these chains. Defaults to every indexed one. */
+  chainIds?: readonly number[]
+}): Promise<OfferPage> => {
+  const targets = indexedChains().filter(
+    (info) => !options?.chainIds || options.chainIds.includes(info.chain.id),
+  )
+
+  const results = await Promise.allSettled(
+    targets.map(async (info) => ({ info, ...(await offersOnChain(info, options)) })),
+  )
+
+  const offers: Offer[] = []
+  const openByChain = new Map<number, number>()
+  const unreachable: { chainId: number; reason: string }[] = []
+
+  results.forEach((result, index) => {
+    const info = targets[index]
+    if (!info) return
+    if (result.status === 'fulfilled') {
+      offers.push(...result.value.offers)
+      openByChain.set(info.chain.id, result.value.open)
+    } else {
+      const reason =
+        result.reason instanceof Error ? result.reason.message : String(result.reason)
+      unreachable.push({ chainId: info.chain.id, reason })
+    }
+  })
+
+  // Newest first across chains. Block numbers are not comparable between chains;
+  // timestamps are, which is why ordering uses createdAt rather than createdBlock.
+  offers.sort((a, b) => Number(b.createdAt - a.createdAt))
+
+  return { offers, openByChain, unreachable }
 }
 
 /** Every offer this address is party to, on either side. */
 export const fetchMyOffers = async (who: Address): Promise<Offer[]> => {
   const address = who.toLowerCase()
-  const data = await query<{ asOwner: RawOffer[]; asCounterparty: RawOffer[] }>(
-    `query MyOffers($who: Bytes!) {
-      asOwner: offers(first: 200, where: { owner: $who }, orderBy: updatedAt, orderDirection: desc) {
-        ${OFFER_FIELDS}
-      }
-      asCounterparty: offers(first: 200, where: { counterparty: $who }, orderBy: updatedAt, orderDirection: desc) {
-        ${OFFER_FIELDS}
-      }
-    }`,
-    { who: address },
+
+  const results = await Promise.allSettled(
+    indexedChains().map(async (info) => {
+      const data = await query<{ asOwner: RawOffer[]; asCounterparty: RawOffer[] }>(
+        info.subgraph as string,
+        `query MyOffers($who: Bytes!) {
+          asOwner: offers(first: 200, where: { owner: $who }, orderBy: updatedAt, orderDirection: desc) {
+            ${OFFER_FIELDS}
+          }
+          asCounterparty: offers(first: 200, where: { counterparty: $who }, orderBy: updatedAt, orderDirection: desc) {
+            ${OFFER_FIELDS}
+          }
+        }`,
+        { who: address },
+      )
+      return [...data.asOwner, ...data.asCounterparty].map((raw) => decode(raw, info.chain.id))
+    }),
   )
 
-  // An address can be both maker and taker across different offers, and the two
-  // lists can overlap on nothing — dedupe by id regardless.
+  /*
+   * Keyed by `(chainId, offerId)`, never by id alone: ids restart at 1 on each
+   * deployment, so offer #1 exists on all three chains and keying by id would
+   * silently drop two of them.
+   */
   const seen = new Map<string, Offer>()
-  for (const raw of [...data.asOwner, ...data.asCounterparty]) {
-    seen.set(raw.offerId, decode(raw))
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
+    for (const offer of result.value) seen.set(`${offer.chainId}:${offer.offerId}`, offer)
   }
   return [...seen.values()].sort((a, b) => Number(b.updatedAt - a.updatedAt))
 }
 
-export const fetchOffer = async (offerId: bigint): Promise<Offer | null> => {
+/** One offer, on the chain it lives on — an id alone does not identify it. */
+export const fetchOffer = async (chainId: number, offerId: bigint): Promise<Offer | null> => {
+  const info = indexedChains().find((c) => c.chain.id === chainId)
+  if (!info) return null
   const data = await query<{ offer: RawOffer | null }>(
+    info.subgraph as string,
     `query Offer($id: ID!) { offer(id: $id) { ${OFFER_FIELDS} } }`,
     { id: offerId.toString() },
   )
-  return data.offer ? decode(data.offer) : null
+  return data.offer ? decode(data.offer, chainId) : null
 }
 
 export type MarketParameters = {
@@ -176,7 +256,11 @@ export type MarketParameters = {
  * Note the plural: `MarketParameters` already ends in s, so graph-node exposes
  * the list as `marketParameters_collection`.
  */
-export const fetchMarketParameters = async (): Promise<MarketParameters | null> => {
+export const fetchMarketParameters = async (
+  chainId: number,
+): Promise<MarketParameters | null> => {
+  const info = indexedChains().find((c) => c.chain.id === chainId)
+  if (!info) return null
   const data = await query<{
     marketParameters_collection: {
       minimumOffer: string
@@ -187,6 +271,7 @@ export const fetchMarketParameters = async (): Promise<MarketParameters | null> 
       t1Delay: string
     }[]
   }>(
+    info.subgraph as string,
     `query Parameters {
       marketParameters_collection(first: 1, orderBy: block, orderDirection: desc) {
         minimumOffer
@@ -217,26 +302,39 @@ export const fetchMarketParameters = async (): Promise<MarketParameters | null> 
  * one difference worth the query: here it is countable on-chain rather than
  * asserted by the venue.
  */
-export const fetchSettledCounts = async (addresses: readonly Address[]): Promise<Map<string, number>> => {
+export const fetchSettledCounts = async (
+  addresses: readonly Address[],
+): Promise<Map<string, number>> => {
   const unique = [...new Set(addresses.map((a) => a.toLowerCase()))]
   if (unique.length === 0) return new Map()
 
-  const data = await query<{ asOwner: { owner: string }[]; asCounterparty: { counterparty: string }[] }>(
-    `query Settled($who: [Bytes!]!) {
-      asOwner: offers(first: 1000, where: { owner_in: $who, state: CLAIMED }) { owner }
-      asCounterparty: offers(first: 1000, where: { counterparty_in: $who, state: CLAIMED }) { counterparty }
-    }`,
-    { who: unique },
+  const counts = new Map<string, number>(unique.map((a) => [a, 0]))
+
+  const results = await Promise.allSettled(
+    indexedChains().map((info) =>
+      query<{ asOwner: { owner: string }[]; asCounterparty: { counterparty: string }[] }>(
+        info.subgraph as string,
+        `query Settled($who: [Bytes!]!) {
+          asOwner: offers(first: 1000, where: { owner_in: $who, state: CLAIMED }) { owner }
+          asCounterparty: offers(first: 1000, where: { counterparty_in: $who, state: CLAIMED }) { counterparty }
+        }`,
+        { who: unique },
+      ),
+    ),
   )
 
-  const counts = new Map<string, number>(unique.map((a) => [a, 0]))
-  for (const row of data.asOwner) {
-    const key = row.owner.toLowerCase()
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  for (const row of data.asCounterparty) {
-    const key = row.counterparty.toLowerCase()
-    counts.set(key, (counts.get(key) ?? 0) + 1)
+  // Summed across chains: a trader's record is theirs wherever they traded. The
+  // signal is about the person, not the deployment.
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
+    for (const row of result.value.asOwner) {
+      const key = row.owner.toLowerCase()
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    for (const row of result.value.asCounterparty) {
+      const key = row.counterparty.toLowerCase()
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
   }
   return counts
 }
@@ -245,8 +343,11 @@ export const fetchSettledCounts = async (addresses: readonly Address[]): Promise
  * Anything the contract owes this address from a payout it could not deliver.
  * Maintained purely from logs: sum(PayoutCredit) − sum(AccountWithdrawal).
  */
-export const fetchWithdrawable = async (who: Address): Promise<bigint> => {
+export const fetchWithdrawable = async (who: Address, chainId: number): Promise<bigint> => {
+  const info = indexedChains().find((c) => c.chain.id === chainId)
+  if (!info) return 0n
   const data = await query<{ account: { withdrawable: string } | null }>(
+    info.subgraph as string,
     `query Account($id: ID!) { account(id: $id) { withdrawable } }`,
     { id: who.toLowerCase() },
   )

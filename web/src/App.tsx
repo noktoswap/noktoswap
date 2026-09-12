@@ -39,7 +39,7 @@ const asKind = <K extends NonNullable<Modal>['kind']>(kind: K) => {
 const Modals = (): JSX.Element => (
   <Switch>
     <Match when={asKind('order')()}>
-      {(current) => <OrderDialog offerId={current().offerId} />}
+      {(current) => <OrderDialog chainId={current().chainId} offerId={current().offerId} />}
     </Match>
     <Match when={asKind('create')()}>
       <CreateOffer />

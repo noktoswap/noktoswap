@@ -1,7 +1,7 @@
 import { A } from '@solidjs/router'
 import { For, Show, createMemo, createSignal, type JSX } from 'solid-js'
 import { Footer, Nav } from '../components/Nav'
-import { HOME_CHAIN, chainLabel } from '../lib/chains'
+import { chainLabel } from '../lib/chains'
 import { countdown, formatEth, formatXmr, isUrgent, shortAddress } from '../lib/format'
 import { orderStatus, type Offer, type OrderStatus } from '../lib/offers'
 import { useApp, useSettledCount } from '../state/app'
@@ -40,12 +40,12 @@ const OrderRow = (props: { offer: Offer; status: OrderStatus; live: boolean }): 
         <span style={{ 'font-size': '17px' }}>{props.status.headline}</span>
         <span class="cap">
           {pair()} ·{' '}
-          <Show when={other()} fallback={<>posted on {chainLabel(app.homeChainId)}</>}>
+          <Show when={other()} fallback={<>posted on {chainLabel(props.offer.chainId)}</>}>
             {(address) => (
               <>
                 with {shortAddress(address())}
                 <Show when={settled() !== null}> · {settled()} done</Show> ·{' '}
-                {chainLabel(app.homeChainId)}
+                {chainLabel(props.offer.chainId)}
               </>
             )}
           </Show>
@@ -63,7 +63,7 @@ const OrderRow = (props: { offer: Offer; status: OrderStatus; live: boolean }): 
           'btn-fill': props.live,
           'btn-exit': props.status.primary?.kind === 'quit',
         }}
-        onClick={() => openOrder(props.offer.offerId)}
+        onClick={() => openOrder(props.offer.chainId, props.offer.offerId)}
       >
         {props.status.primary?.label ?? props.status.secondary?.label ?? 'Open'}
       </button>
@@ -194,7 +194,7 @@ export const Orders = (): JSX.Element => {
         </Show>
       </div>
 
-      <Footer contract={HOME_CHAIN.deployment ?? undefined} explorer={HOME_CHAIN.explorer} />
+      <Footer chainId={app.actionChainId()} />
     </div>
   )
 }

@@ -21,7 +21,18 @@ import {
   pointToUint256,
   proves,
 } from './keys'
+import {
+  CHAINS,
+  chainInfo,
+  deployedButUnindexed,
+  indexedChains,
+  isTradable,
+  realmOf,
+  sameRealm,
+  visibleChains,
+} from './chains'
 import { logoCandidates } from './icons'
+import { totalOpen } from './subgraph'
 import {
   ED25519_L,
   combinePrivateKeys,
@@ -36,6 +47,8 @@ import {
 import { XMR, isXmr, nativeOf, type Currency } from './tokens'
 import {
   NEAR_BAND,
+  bookGoingRate,
+  canTake,
   matchOffers,
   medianRate,
   orderStatus,
@@ -113,7 +126,11 @@ const CAROL = '0x00000000000000000000000000000000000000c0' as Address
 
 const xmr = (amount: string) => parseUnits(amount, 12)
 
+const SEPOLIA = 11155111
+
 const offer = (over: Partial<Offer> & { kind: OfferKind; state: OfferState }): Offer => ({
+  // Defaulted so the single-chain cases stay readable; the multi-chain ones set it.
+  chainId: SEPOLIA,
   offerId: 1n,
   owner: ALICE,
   counterparty: null,
@@ -1048,5 +1065,216 @@ describe('the receive readout has one definition', () => {
     const matching = matchOffers(book, null, 'BUY')
     expect(receiveAmountFor(matching, null, matching.rate)).toBeNull()
     expect(receiveAmountFor(matching, { leg: 'eth', amount: parseEther('1') }, null)).toBeNull()
+  })
+})
+
+describe('an offer is identified by chain and id, never id alone', () => {
+  const MAINNET = 1
+  const BASE = 8453
+
+  it('keeps same-numbered offers on different chains distinct', () => {
+    // Ids restart at 1 on every deployment, so #1 exists on all three chains.
+    // Anything keyed by id alone silently collapses them.
+    const book = [
+      offer({ chainId: SEPOLIA, offerId: 1n, kind: 'SELL', state: 'OPEN', amount: parseEther('0.25'), xmrAmount: xmr('1.2') }),
+      offer({ chainId: MAINNET, offerId: 1n, kind: 'SELL', state: 'OPEN', amount: parseEther('0.25'), xmrAmount: xmr('1.3') }),
+      offer({ chainId: BASE, offerId: 1n, kind: 'SELL', state: 'OPEN', amount: parseEther('0.25'), xmrAmount: xmr('1.1') }),
+    ]
+    const result = matchOffers(book, { leg: 'eth', amount: parseEther('0.25') }, 'SELL')
+    expect(result.exact).toHaveLength(3)
+    // And they are genuinely different trades — best rate wins, not first seen.
+    expect(result.best?.offer.chainId).toBe(MAINNET)
+  })
+
+  it('matches across chains, because the book is one market', () => {
+    // A reader does not care which chain has their size; switching to take one is
+    // a single wallet prompt. What limits them is where their money already is,
+    // which is what the chain picker's balances are for.
+    const book = [
+      offer({ chainId: MAINNET, offerId: 7n, kind: 'SELL', state: 'OPEN', amount: parseEther('1'), xmrAmount: xmr('5') }),
+    ]
+    const result = matchOffers(book, { leg: 'eth', amount: parseEther('1') }, 'SELL')
+    expect(result.verdict).toBe('exact')
+    expect(result.best?.offer.chainId).toBe(MAINNET)
+  })
+
+  it('reports open counts per chain and totals them', () => {
+    const page = {
+      offers: [],
+      openByChain: new Map([
+        [SEPOLIA, 1],
+        [MAINNET, 0],
+        [BASE, 4],
+      ]),
+      unreachable: [],
+    }
+    expect(totalOpen(page)).toBe(5)
+    // A chain that answered with zero is not the same fact as one that did not
+    // answer — the first is in the map, the second is in `unreachable`.
+    expect(page.openByChain.has(MAINNET)).toBe(true)
+  })
+
+  it('counts only the chains that answered', () => {
+    // One unreachable subgraph must not be reported as an empty market.
+    const page = {
+      offers: [],
+      openByChain: new Map([[SEPOLIA, 2]]),
+      unreachable: [{ chainId: BASE, reason: 'noktoswap-base responded 502' }],
+    }
+    expect(totalOpen(page)).toBe(2)
+    expect(page.openByChain.has(BASE)).toBe(false)
+  })
+
+  it('knows which chains can be traded on and which are indexed', () => {
+    // Deployed and indexed are different facts: Base Sepolia has a contract and
+    // no subgraph, so it can be traded by id but not browsed.
+    expect(isTradable(SEPOLIA)).toBe(true)
+    expect(isTradable(MAINNET)).toBe(true)
+    expect(isTradable(42161)).toBe(false) // Arbitrum: claimable, not deployed
+
+    const indexed = indexedChains().map((c) => c.chain.id)
+    expect(indexed).toContain(SEPOLIA)
+    expect(indexed).toContain(MAINNET)
+    expect(indexed).toContain(BASE)
+    expect(indexed).not.toContain(84532) // Base Sepolia: deployed, no subgraph
+
+    const gap = deployedButUnindexed().map((c) => c.chain.id)
+    expect(gap).toEqual([84532])
+  })
+})
+
+describe('a thin book does not get to set the rate', () => {
+  const at = (rate: number, id: bigint) =>
+    offer({
+      offerId: id,
+      kind: 'SELL',
+      state: 'OPEN',
+      amount: parseEther('1'),
+      xmrAmount: xmr(String(rate)),
+    })
+
+  it('refuses to call one offer a going rate', () => {
+    // The bug: a fresh deployment's single test offer was priced at ~482 XMR/ETH
+    // against a real rate near 4.8, and the widget presented it as "the book's
+    // going rate". A median of one is that one offer.
+    expect(bookGoingRate([at(482, 1n)], 4.8)).toBeNull()
+    expect(bookGoingRate([at(4.8, 1n), at(4.9, 2n)], 4.8)).toBeNull()
+  })
+
+  it('uses the book once there is a book', () => {
+    const rate = bookGoingRate([at(4.7, 1n), at(4.8, 2n), at(4.9, 3n)], 4.8)
+    expect(rate).toBe(4.8)
+  })
+
+  it('rejects a book that has drifted implausibly from the feed', () => {
+    // Three offers is a sample, but three offers priced a hundred times off is a
+    // mispriced book, not a market that happens to disagree with the feed.
+    expect(bookGoingRate([at(480, 1n), at(482, 2n), at(484, 3n)], 4.8)).toBeNull()
+    // A normal disagreement is still the book's to make — it is the thing a maker
+    // actually competes with.
+    expect(bookGoingRate([at(5.4, 1n), at(5.5, 2n), at(5.6, 3n)], 4.8)).toBe(5.5)
+  })
+
+  it('trusts the book when there is no feed to check against', () => {
+    // No reference means no sanity check available — but the sample rule still
+    // applies, so this is a real book either way.
+    expect(bookGoingRate([at(480, 1n), at(482, 2n), at(484, 3n)], null)).toBe(482)
+  })
+
+  it('ignores offers that are not open', () => {
+    const book = [at(4.8, 1n), at(4.9, 2n), { ...at(5.0, 3n), state: 'CANCELLED' as const }]
+    expect(bookGoingRate(book, 4.8)).toBeNull()
+  })
+})
+
+describe('test money and real money are different markets', () => {
+  it('never lets a testnet chain see a mainnet one, or the reverse', () => {
+    // The bug: a wallet on Ethereum was shown the single Sepolia offer and its
+    // price. The design's "one book, not four" means Ethereum/Optimism/Arbitrum/
+    // Base — mainnets one wallet prompt apart. Sepolia is only here because it is
+    // where the contract landed first.
+    expect(realmOf(1)).toBe('mainnet')
+    expect(realmOf(8453)).toBe('mainnet')
+    expect(realmOf(11155111)).toBe('testnet')
+    expect(realmOf(84532)).toBe('testnet')
+
+    expect(sameRealm(1, 8453)).toBe(true)
+    expect(sameRealm(1, 11155111)).toBe(false)
+    expect(sameRealm(11155111, 84532)).toBe(true)
+  })
+
+  it('shows a mainnet reader only indexed mainnets', () => {
+    const ids = visibleChains(1).map((c) => c.chain.id)
+    expect(ids).toContain(1)
+    expect(ids).toContain(8453)
+    expect(ids).not.toContain(11155111)
+  })
+
+  it('shows a testnet reader only indexed testnets', () => {
+    const ids = visibleChains(11155111).map((c) => c.chain.id)
+    expect(ids).toEqual([11155111])
+    // Base Sepolia is deployed but unindexed, so it has no book to show.
+    expect(ids).not.toContain(84532)
+  })
+
+  it('pairs the Monero network to the realm, which is why this matters', () => {
+    // A testnet chain yields a stagenet escrow address. If the realms shared a
+    // book, a mainnet reader could act on an offer whose escrow is stagenet.
+    expect(chainInfo(1)?.moneroMainnet).toBe(true)
+    expect(chainInfo(8453)?.moneroMainnet).toBe(true)
+    expect(chainInfo(11155111)?.moneroMainnet).toBe(false)
+    expect(chainInfo(84532)?.moneroMainnet).toBe(false)
+
+    for (const info of CHAINS) {
+      // The pairing must hold for every chain, not just the ones checked above.
+      expect(info.moneroMainnet).toBe(realmOf(info.chain.id) === 'mainnet')
+    }
+  })
+})
+
+describe('on an OPEN offer, counterparty is a restriction not a party', () => {
+  // Caught by comparing against v3xlabs/xmrp2p, which gates Take on
+  // `counterparty === 0x0 || counterparty === me`. `take` is what promotes the
+  // field to a party, by overwriting it with the taker.
+  const reserved = (to: Address) =>
+    offer({ kind: 'BUY', state: 'OPEN', owner: ALICE, counterparty: to })
+
+  it('does not make the reserved taker a party before they take', () => {
+    // This showed BOB the maker's Cancel button, which reverts — he is not the
+    // owner. Until an offer is taken, the maker is the only party.
+    expect(sideOf(reserved(BOB), BOB)).toBe('none')
+    const status = orderStatus(reserved(BOB), BOB, 0)
+    expect(status.secondary?.kind).not.toBe('cancel')
+    expect(status.primary?.kind).toBe('take')
+  })
+
+  it('offers no button to someone the offer is not for', () => {
+    // This showed CAROL "Take this offer", which reverts with ErrorNonMember.
+    const status = orderStatus(reserved(BOB), CAROL, 0)
+    expect(status.primary).toBeNull()
+    expect(status.headline).toMatch(/reserved/i)
+    expect(canTake(reserved(BOB), CAROL)).toBe(false)
+  })
+
+  it('still lets the maker cancel their own reserved offer', () => {
+    const status = orderStatus(reserved(BOB), ALICE, 0)
+    expect(status.secondary?.kind).toBe('cancel')
+    expect(canTake(reserved(BOB), ALICE)).toBe(false)
+  })
+
+  it('mirrors the contract on an unrestricted offer', () => {
+    const open = offer({ kind: 'BUY', state: 'OPEN', owner: ALICE, counterparty: null })
+    expect(canTake(open, CAROL)).toBe(true)
+    // …but never the maker: `require(msg.sender != offer.owner)`.
+    expect(canTake(open, ALICE)).toBe(false)
+    expect(canTake(open, undefined)).toBe(false)
+  })
+
+  it('treats counterparty as a party once the offer is taken', () => {
+    // After `take`, the field holds the actual taker and the roles apply.
+    const taken = offer({ kind: 'BUY', state: 'TAKEN', owner: ALICE, counterparty: BOB })
+    expect(sideOf(taken, BOB)).toBe('xmr')
+    expect(sideOf(taken, ALICE)).toBe('evm')
+    expect(canTake(taken, CAROL)).toBe(false)
   })
 })

@@ -18,6 +18,15 @@ export const OFFER_STATE: readonly (OfferState | 'INVALID')[] = [
 
 /** An offer as the subgraph serves it: the book, with no key material. */
 export type Offer = {
+  /**
+   * The chain this offer lives on, and never leaves.
+   *
+   * Not a display detail. `offerId` restarts at 1 on every deployment, so an id
+   * alone does not identify an offer — every read, every contract call and every
+   * dedupe key needs the pair. The subgraph cannot supply it (each one indexes a
+   * single chain), so it is tagged from whichever endpoint answered.
+   */
+  chainId: number
   offerId: bigint
   kind: OfferKind
   state: OfferState
@@ -53,11 +62,50 @@ export const sideOf = (offer: Offer, who: Address | undefined): Side => {
   if (!who) return 'none'
   const me = who.toLowerCase()
   const isOwner = offer.owner.toLowerCase() === me
+
+  /*
+   * On an OPEN offer, `counterparty` is a *restriction* — the one address allowed
+   * to take it — not a party to the trade. `take` is what promotes it to a party,
+   * by overwriting the field with the taker.
+   *
+   * Reading it as a party before that breaks both ways: an offer reserved for you
+   * showed the maker's Cancel button (which reverts, you are not the owner), and
+   * one reserved for somebody else showed Take (which reverts with ErrorNonMember).
+   * Until an offer is taken, the maker is the only party.
+   */
+  if (offer.state === 'OPEN') {
+    if (!isOwner) return 'none'
+    return offer.kind === 'BUY' ? 'evm' : 'xmr'
+  }
+
   const isCounterparty = offer.counterparty?.toLowerCase() === me
   if (!isOwner && !isCounterparty) return 'none'
   if (offer.kind === 'BUY') return isOwner ? 'evm' : 'xmr'
   return isOwner ? 'xmr' : 'evm'
 }
+
+/**
+ * Whether this address may take this offer, mirroring the contract:
+ * `require(address(0) == counterparty || counterparty == msg.sender)` plus
+ * `require(msg.sender != owner)`.
+ *
+ * A maker can restrict an offer to one counterparty. Offering Take to anyone else
+ * is offering a button that reverts.
+ */
+export const canTake = (offer: Offer, who: Address | undefined): boolean => {
+  if (!who || offer.state !== 'OPEN') return false
+  const me = who.toLowerCase()
+  if (offer.owner.toLowerCase() === me) return false
+  const restricted = offer.counterparty
+  return restricted === null || restricted.toLowerCase() === me
+}
+
+/** True when an offer is reserved for an address other than this one. */
+export const isReservedForOther = (offer: Offer, who: Address | undefined): boolean =>
+  offer.state === 'OPEN' &&
+  offer.counterparty !== null &&
+  offer.counterparty.toLowerCase() !== who?.toLowerCase() &&
+  offer.owner.toLowerCase() !== who?.toLowerCase()
 
 /** The EVM side receives XMR and pays ETH; the XMR side does the reverse. */
 export const isParty = (offer: Offer, who: Address | undefined): boolean =>
@@ -141,20 +189,29 @@ export const orderStatus = (
 
   switch (offer.state) {
     case 'OPEN': {
-      if (side === 'none') {
+      // The maker's own offer. No clock, so it is never "waiting on you".
+      if (side !== 'none') {
         return {
           ...base,
           stage: 'open',
-          headline: 'Open — nobody has taken this yet',
-          primary: { kind: 'take', label: 'Take this offer' },
+          headline: 'Nobody has taken this yet',
+          secondary: { kind: 'cancel', label: 'Cancel' },
         }
       }
-      // The maker's own offer. No clock, so it is never "waiting on you".
+      // Reserved for a named counterparty, and not this one. The contract would
+      // revert with ErrorNonMember, so there is no button to offer.
+      if (isReservedForOther(offer, who)) {
+        return {
+          ...base,
+          stage: 'open',
+          headline: 'Reserved for another address',
+        }
+      }
       return {
         ...base,
         stage: 'open',
-        headline: 'Nobody has taken this yet',
-        secondary: { kind: 'cancel', label: 'Cancel' },
+        headline: 'Open — nobody has taken this yet',
+        primary: canTake(offer, who) ? { kind: 'take', label: 'Take this offer' } : null,
       }
     }
 
@@ -466,6 +523,56 @@ export const medianRate = (rates: readonly (number | null)[]): number | null => 
   if (xs.length === 0) return null
   const mid = Math.floor(xs.length / 2)
   return xs.length % 2 === 1 ? xs[mid]! : (xs[mid - 1]! + xs[mid]!) / 2
+}
+
+/**
+ * How many priced offers it takes before a median is a *rate* rather than an
+ * anecdote.
+ *
+ * With one offer on the book, `medianRate` returns that offer's price and the UI
+ * called it "the book's going rate" — which on a fresh deployment meant a single
+ * mispriced test offer was presented as the market, at roughly a hundred times
+ * the real figure. A median of one is not a median.
+ */
+export const MIN_BOOK_SAMPLE = 3
+
+/**
+ * The book's own rate, or null when the book is too thin or too strange to have
+ * one.
+ *
+ * Two guards, and both have to be null-returning rather than clamping, because
+ * the caller has a genuinely better answer available (a price feed) and should
+ * be allowed to reach for it:
+ *
+ *   sample — fewer than `MIN_BOOK_SAMPLE` offers is not a market
+ *   sanity — a book rate wildly adrift of a reference is a mispriced offer, not
+ *            a market that happens to disagree
+ *
+ * The design argued that what a maker competes with is the people already
+ * offering, and that is right once there *are* people already offering. It is
+ * not an argument for quoting the first junk offer anyone posts.
+ */
+export const IMPLAUSIBLE_FACTOR = 5
+
+export const bookGoingRate = (
+  offers: readonly Offer[],
+  reference: number | null,
+): number | null => {
+  const priced = offers
+    .filter((o) => o.state === 'OPEN')
+    .map((o) => rateXmrPerEth(o.amount, o.xmrAmount))
+    .filter((r): r is number => r !== null && Number.isFinite(r))
+
+  if (priced.length < MIN_BOOK_SAMPLE) return null
+
+  const median = medianRate(priced)
+  if (median === null) return null
+
+  if (reference !== null && reference > 0) {
+    const ratio = median > reference ? median / reference : reference / median
+    if (ratio > IMPLAUSIBLE_FACTOR) return null
+  }
+  return median
 }
 
 /** The closest open offer, measured on the leg the reader typed. */

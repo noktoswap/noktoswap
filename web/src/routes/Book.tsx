@@ -5,8 +5,8 @@ import { OfferPhoneCard } from '../components/OfferCard'
 import { WaitingOnYou } from '../components/WaitingOnYou'
 import { Chevron, Plus } from '../components/icons'
 import { ChainIcon, TokenIcon } from '../components/TokenIcon'
-import { HOME_CHAIN, chainLabel } from '../lib/chains'
-import { formatEth, formatRate, formatXmr, relativeTime, shortAddress } from '../lib/format'
+import { chainLabel } from '../lib/chains'
+import { formatEth, formatRate, formatXmr, plural, relativeTime, shortAddress } from '../lib/format'
 import { rateXmrPerEth } from '../lib/format'
 import type { Offer } from '../lib/offers'
 import { useApp, useSettledCount } from '../state/app'
@@ -46,7 +46,7 @@ const BookRow = (props: { offer: Offer }): JSX.Element => {
       class="tgrid"
       classList={{ mine: mine() }}
       style={{ padding: '12px 6px', 'border-bottom': '1px solid var(--box2)', width: '100%' }}
-      onClick={() => openOrder(props.offer.offerId)}
+      onClick={() => openOrder(props.offer.chainId, props.offer.offerId)}
     >
       <Cell>{props.offer.kind === 'BUY' ? 'XMR → ETH' : 'ETH → XMR'}</Cell>
       <span class="stack2">
@@ -63,7 +63,7 @@ const BookRow = (props: { offer: Offer }): JSX.Element => {
           name kept on hover and in the accessibility tree, since an unlabelled
           glyph in a data table is a riddle.
         */}
-        <ChainIcon chainId={app.homeChainId} size={24} label={chainLabel(app.homeChainId)} />
+        <ChainIcon chainId={props.offer.chainId} size={24} label={chainLabel(props.offer.chainId)} />
       </Cell>
       <Cell>
         <span class="cap2">{relativeTime(props.offer.createdAt, app.now() * 1000)}</span>
@@ -95,9 +95,13 @@ export const Book = (): JSX.Element => {
   const rows = createMemo(() => {
     // Every offer is on the home chain today; the filter still applies so the
     // control is not a lie when a second deployment lands.
+    // Filter on each offer's own chain. It used to compare the filter against a
+    // single global chain, which meant selecting one chain either showed the whole
+    // book or nothing at all.
     const selected = bookChains()
-    const visible =
-      isAllChains(selected) || selected.includes(app.homeChainId) ? app.book() : []
+    const visible = isAllChains(selected)
+      ? app.book()
+      : app.book().filter((offer) => selected.includes(offer.chainId))
     return visible.slice(0, shown())
   })
 
@@ -184,7 +188,10 @@ export const Book = (): JSX.Element => {
               gap: '10px',
             }}
           >
-            <span class="cap">{app.openCount()} open on {chainLabel(app.homeChainId)}</span>
+            <span class="cap">
+              {app.openCount()} open across {plural(app.openByChain().size, 'chain')}
+              <Show when={app.realm() === 'testnet'}> · test networks</Show>
+            </span>
             <button
               class="chip"
               classList={{ 'chip-on': !isAllChains(bookChains()) }}
@@ -193,9 +200,9 @@ export const Book = (): JSX.Element => {
             >
               <Show
                 when={bookChains().length === 1}
-                fallback={<ChainIcon chainId={app.homeChainId} size={15} />}
+                fallback={<ChainIcon chainId={app.actionChainId()} size={15} />}
               >
-                <ChainIcon chainId={bookChains()[0] ?? app.homeChainId} size={15} />
+                <ChainIcon chainId={bookChains()[0] ?? app.actionChainId()} size={15} />
               </Show>
               {chainLabelForChip()}
               <Chevron size={12} />
@@ -276,7 +283,7 @@ export const Book = (): JSX.Element => {
         </div>
       </div>
 
-      <Footer contract={HOME_CHAIN.deployment ?? undefined} explorer={HOME_CHAIN.explorer} />
+      <Footer chainId={app.actionChainId()} />
     </div>
   )
 }

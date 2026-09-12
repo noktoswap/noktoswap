@@ -307,16 +307,23 @@ const EscrowPanel = (props: {
   )
 }
 
-export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
+/**
+ * `chainId` is the offer's, passed in rather than read from app state.
+ *
+ * Offer ids restart at 1 on every deployment, so #1 exists on all three chains.
+ * Every read, write and stored key below is keyed to this chain — resolving it
+ * globally would open one chain's order and then sign the other's transaction.
+ */
+export const OrderDialog = (props: { chainId: number; offerId: bigint }): JSX.Element => {
   const app = useApp()
   const [busy, setBusy] = createSignal<string | null>(null)
   const [error, setError] = createSignal<string | null>(null)
   /** A freshly generated escrow key, offered as a file before it can be lost. */
   const [backup, setBackup] = createSignal<string | null>(null)
   /** Which currency a claim should pay out in. ETH means no swap. */
-  const [payoutCurrency, setPayoutCurrency] = createSignal<Currency>(nativeOf(app.homeChainId))
+  const [payoutCurrency, setPayoutCurrency] = createSignal<Currency>(nativeOf(props.chainId))
 
-  const home = chainInfo(app.homeChainId)
+  const home = chainInfo(props.chainId)
 
   /**
    * Which Monero network the escrow belongs to, taken from the EVM chain rather
@@ -327,11 +334,11 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
 
   /** A label a wallet will show against the imported account. */
   const escrowLabel = () =>
-    `Noktoswap ${chainLabel(app.homeChainId)} #${props.offerId.toString()}`
+    `Noktoswap ${chainLabel(props.chainId)} #${props.offerId.toString()}`
 
   const onchain = useQuery(() => ({
-    queryKey: ['onchain-offer', app.homeChainId, props.offerId.toString()],
-    queryFn: () => readOffer(app.homeChainId, props.offerId),
+    queryKey: ['onchain-offer', props.chainId, props.offerId.toString()],
+    queryFn: () => readOffer(props.chainId, props.offerId),
     refetchInterval: ORDER_POLL_MS,
   }))
 
@@ -345,6 +352,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
     const chain = onchain.data
     if (!chain || chain.kind === 'INVALID' || chain.state === 'INVALID') return null
     return {
+      chainId: props.chainId,
       offerId: chain.id,
       kind: chain.kind,
       state: chain.state,
@@ -370,7 +378,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
     return offer ? orderStatus(offer, app.address(), app.now()) : null
   })
 
-  const wrongNetwork = () => app.walletChainId() !== app.homeChainId
+  const wrongNetwork = () => app.walletChainId() !== props.chainId
   const counterpartySettled = useSettledCount(() => {
     const offer = asOffer()
     if (!offer) return null
@@ -394,9 +402,9 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
     setError(null)
     setBusy(label)
     try {
-      if (wrongNetwork()) await switchChain(config, { chainId: app.homeChainId })
+      if (wrongNetwork()) await switchChain(config, { chainId: props.chainId })
       const hash = await action()
-      await awaitReceipt(app.homeChainId, hash)
+      await awaitReceipt(props.chainId, hash)
       await onchain.refetch()
       app.refetchBook()
       app.refetchMyOrders()
@@ -420,7 +428,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
    * different device, cleared site data — the trade cannot be claimed from here,
    * and saying so plainly is the only honest thing to do.
    */
-  const storedKeys = () => loadKeypair(app.homeChainId, keyRef())
+  const storedKeys = () => loadKeypair(props.chainId, keyRef())
 
   const perform = (kind: string) => {
     const offer = asOffer()
@@ -429,11 +437,11 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
 
     switch (kind) {
       case 'cancel':
-        void run('cancel', () => cancelOffer(app.homeChainId, offer.offerId))
+        void run('cancel', () => cancelOffer(props.chainId, offer.offerId))
         return
 
       case 'ready':
-        void run('ready', () => readyOffer(app.homeChainId, offer.offerId))
+        void run('ready', () => readyOffer(props.chainId, offer.offerId))
         return
 
       case 'take': {
@@ -442,7 +450,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
         // that key is the only thing that can claim the trade.
         const pair = generateCanonicalKeypair()
         try {
-          saveKeypair(app.homeChainId, keyRef(), pair)
+          saveKeypair(props.chainId, keyRef(), pair)
         } catch {
           setError(
             'This browser will not store the escrow key, so the trade could not be claimed later. Turn off private browsing or allow site data first.',
@@ -454,7 +462,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
         const { spendingKey, viewingKey } = keysForTake(offer.kind, pair)
         void run('take', () =>
           takeOffer({
-            chainId: app.homeChainId,
+            chainId: props.chainId,
             offerId: offer.offerId,
             spendingKey,
             viewingKey,
@@ -480,7 +488,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
           )
           return
         }
-        void run('claim', () => claimOffer(app.homeChainId, offer.offerId, pair.privateSpend))
+        void run('claim', () => claimOffer(props.chainId, offer.offerId, pair.privateSpend))
         return
       }
 
@@ -499,7 +507,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
         }
         const { spendingKey, viewingKey } = keysForQuit(side, pair)
         void run('quit', () =>
-          quitOffer({ chainId: app.homeChainId, offerId: offer.offerId, spendingKey, viewingKey }),
+          quitOffer({ chainId: props.chainId, offerId: offer.offerId, spendingKey, viewingKey }),
         )
         return
       }
@@ -730,7 +738,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
                     {busy() === action().kind
                       ? 'Confirm in your wallet…'
                       : wrongNetwork()
-                        ? `Switch to ${chainLabel(app.homeChainId)} and ${action().label.toLowerCase()}`
+                        ? `Switch to ${chainLabel(props.chainId)} and ${action().label.toLowerCase()}`
                         : action().label}
                   </button>
                 )}
@@ -831,7 +839,7 @@ export const OrderDialog = (props: { offerId: bigint }): JSX.Element => {
               }}
             >
               <span class="cap">
-                Order #{offer().offerId.toString()} on {chainLabel(app.homeChainId)}
+                Order #{offer().offerId.toString()} on {chainLabel(props.chainId)}
               </span>
               <Show when={explorerLink()}>
                 {(href) => (

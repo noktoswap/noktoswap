@@ -291,7 +291,7 @@ export const TokenPicker = (props: {
         onClick={openNetworks}
       >
         <Show when={selectedNetworks().length === 1}>
-          <ChainIcon chainId={selectedNetworks()[0] ?? app.homeChainId} size={16} />
+          <ChainIcon chainId={selectedNetworks()[0] ?? app.actionChainId()} size={16} />
         </Show>
         {networkLabel()}
         <Chevron size={12} />

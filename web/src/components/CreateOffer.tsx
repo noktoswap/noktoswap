@@ -71,8 +71,8 @@ export const CreateOffer = (): JSX.Element => {
 
   /** Contract parameters gate what can be posted at all. Read them live. */
   const parameters = useQuery(() => ({
-    queryKey: ['contract-parameters', app.homeChainId],
-    queryFn: () => readParameters(app.homeChainId),
+    queryKey: ['contract-parameters', app.actionChainId()],
+    queryFn: () => readParameters(app.actionChainId()),
     staleTime: 10 * 60_000,
   }))
 
@@ -99,7 +99,7 @@ export const CreateOffer = (): JSX.Element => {
     return {
       queryKey: [
         'funding-quote',
-        app.homeChainId,
+        app.actionChainId(),
         token,
         required?.toString(),
         who,
@@ -108,7 +108,7 @@ export const CreateOffer = (): JSX.Element => {
       ],
       queryFn: (): Promise<FundingQuote> =>
         quoteFunding({
-          chainId: app.homeChainId,
+          chainId: app.actionChainId(),
           token: token as `0x${string}`,
           ethRequired: required as bigint,
           swapper: who as `0x${string}`,
@@ -349,7 +349,7 @@ export const CreateOffer = (): JSX.Element => {
                 <span class="pill">{kind()}</span>
               </Row>
               <Row k="Chain">
-                <span class="pill">{chainLabel(app.homeChainId)}</span>
+                <span class="pill">{chainLabel(app.actionChainId())}</span>
               </Row>
               <Show when={xmrAmount()}>
                 {(xmr) => (

@@ -26,11 +26,11 @@ const Counterparty = (props: { offer: Offer }): JSX.Element => {
   const settled = useSettledCount(other)
 
   return (
-    <Show when={other()} fallback={<>posted {chainLabel(app.homeChainId)}</>}>
+    <Show when={other()} fallback={<>posted on {chainLabel(props.offer.chainId)}</>}>
       {(address) => (
         <>
           with {shortAddress(address())}
-          <Show when={settled() !== null}> · {settled()} done</Show> · {chainLabel(app.homeChainId)}
+          <Show when={settled() !== null}> · {settled()} done</Show> · {chainLabel(props.offer.chainId)}
         </>
       )}
     </Show>
@@ -63,7 +63,7 @@ const OrderLine = (props: { offer: Offer; status: OrderStatus; compact?: boolean
       </span>
       <button
         class="btn-inline btn-fill"
-        onClick={() => openOrder(props.offer.offerId)}
+        onClick={() => openOrder(props.offer.chainId, props.offer.offerId)}
       >
         {props.status.primary?.label ?? 'Open'}
       </button>

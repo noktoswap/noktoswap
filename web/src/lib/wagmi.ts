@@ -4,7 +4,7 @@ import { coinbaseWallet } from '@wagmi/solid/connectors/coinbaseWallet'
 import { metaMask } from '@wagmi/solid/connectors/metaMask'
 import { safe } from '@wagmi/solid/connectors/safe'
 import type { CreateConnectorFn, Transport } from '@wagmi/core'
-import { CHAINS, HOME_CHAIN } from './chains'
+import { CHAINS } from './chains'
 
 /**
  * `@wagmi/solid` — the official Solid package, not the community `solid-wagmi`.
@@ -43,8 +43,6 @@ const connectors: CreateConnectorFn[] = [
 ]
 
 export const config = createConfig({ chains, transports, connectors })
-
-export const homeChainId = HOME_CHAIN.chain.id
 
 declare module '@wagmi/core' {
   interface Register {

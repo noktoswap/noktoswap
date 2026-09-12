@@ -1,14 +1,18 @@
-import { arbitrum, base, mainnet, optimism, sepolia } from 'viem/chains'
+import { arbitrum, base, baseSepolia, mainnet, optimism, sepolia } from 'viem/chains'
 import type { Address, Chain } from 'viem'
 
 /**
- * The wireframes draw four chains. Exactly one of them has a Noktoswap
- * deployment today, and the chain list is honest about which.
+ * Where the protocol is, and where its book is — which are two different facts.
  *
- * `deployment` null does not mean "hide it": the chain picker still lists the
- * chain, still shows the balance the Token API reports for it, and says plainly
- * that there is nothing to trade there. Fabricating open counts for a chain with
- * no contract would be the one thing worse than an empty book.
+ * `deployment` is whether a contract exists. `indexed` is whether this app can
+ * *list* its offers. The subgraph covers Sepolia only, so mainnet, Base and Base
+ * Sepolia have live contracts whose books are invisible from here.
+ *
+ * Collapsing those into one flag would make the chain picker report "0 open" on
+ * mainnet, which is a claim about the market rather than about our coverage —
+ * exactly the kind of confident wrong number this app avoids elsewhere. A chain
+ * with no contract says "not deployed"; a deployed chain with no indexer says so
+ * too, and neither invents a count.
  */
 export type ChainInfo = {
   readonly chain: Chain
@@ -17,6 +21,17 @@ export type ChainInfo = {
   readonly deployment: Address | null
   /** First block the contract existed at — the floor for any log query. */
   readonly deployedAtBlock: bigint | null
+  /**
+   * The Studio slug indexing this chain, or null if nothing does.
+   *
+   * A subgraph targets exactly one network — every data source in a manifest must
+   * share it — so three indexed chains means three subgraphs and three query
+   * URLs, not one multi-chain subgraph. The client merges them.
+   *
+   * A deployed chain with no slug can still be read from the contract and traded
+   * on by id; it just has no browsable book.
+   */
+  readonly subgraph: string | null
   /**
    * `network` value the Graph Token API keys balances by, or null where the API
    * does not cover the chain. Its enum is mainnets only — Sepolia is not in it,
@@ -36,11 +51,21 @@ export type ChainInfo = {
   readonly moneroMainnet: boolean
 }
 
+/**
+ * The CREATE3 address, identical on every chain deployed after it.
+ *
+ * Sepolia predates it and keeps its own address — which is the whole reason
+ * `deployment` is per-chain rather than one constant.
+ */
+export const CREATE3_ADDRESS = '0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C' as const
+
 const SEPOLIA: ChainInfo = {
   chain: sepolia,
   label: 'Sepolia',
+  // Predates the CREATE3 deployment, and the only chain the subgraph indexes.
   deployment: '0x67DB37c3be37B44c0506e5DF441437C83114bCd2',
   deployedAtBlock: 11670176n,
+  subgraph: 'xmrp-2-p',
   tokenApiNetwork: null,
   uniswapRoutable: true,
   explorer: 'https://sepolia.etherscan.io',
@@ -53,8 +78,9 @@ export const CHAINS: readonly ChainInfo[] = [
   {
     chain: mainnet,
     label: 'Ethereum',
-    deployment: null,
-    deployedAtBlock: null,
+    deployment: CREATE3_ADDRESS,
+    deployedAtBlock: 25962326n,
+    subgraph: 'noktoswap-mainnet',
     tokenApiNetwork: 'mainnet',
     uniswapRoutable: true,
     explorer: 'https://etherscan.io',
@@ -63,18 +89,34 @@ export const CHAINS: readonly ChainInfo[] = [
   {
     chain: base,
     label: 'Base',
-    deployment: null,
-    deployedAtBlock: null,
+    deployment: CREATE3_ADDRESS,
+    deployedAtBlock: 51219297n,
+    subgraph: 'noktoswap-base',
     tokenApiNetwork: 'base',
     uniswapRoutable: true,
     explorer: 'https://basescan.org',
     moneroMainnet: true,
   },
   {
+    chain: baseSepolia,
+    label: 'Base Sepolia',
+    deployment: CREATE3_ADDRESS,
+    deployedAtBlock: 46729575n,
+    // Deployed, but no subgraph — its book is not browsable from here.
+    subgraph: null,
+    // Testnet: no Token API coverage, and stagenet XMR.
+    tokenApiNetwork: null,
+    uniswapRoutable: true,
+    explorer: 'https://sepolia.basescan.org',
+    moneroMainnet: false,
+  },
+  {
     chain: arbitrum,
     label: 'Arbitrum',
+    // Claimable at CREATE3_ADDRESS but not yet deployed.
     deployment: null,
     deployedAtBlock: null,
+    subgraph: null,
     tokenApiNetwork: 'arbitrum-one',
     uniswapRoutable: true,
     explorer: 'https://arbiscan.io',
@@ -85,6 +127,7 @@ export const CHAINS: readonly ChainInfo[] = [
     label: 'Optimism',
     deployment: null,
     deployedAtBlock: null,
+    subgraph: null,
     tokenApiNetwork: 'optimism',
     // Routable, but AMM-only: UniswapX does not fill here.
     uniswapRoutable: true,
@@ -93,11 +136,56 @@ export const CHAINS: readonly ChainInfo[] = [
   },
 ] as const
 
-/** The chain the subgraph indexes, and the only one an offer can live on. */
-export const HOME_CHAIN: ChainInfo = SEPOLIA
+/**
+ * The chain to act on when nothing else decides it — a fresh offer, a wallet on a
+ * chain with no contract.
+ *
+ * Deliberately not "the chain the book lives on" any more: the book spans every
+ * indexed chain, and an offer's own chain travels with it. Anywhere this is used
+ * as a stand-in for an offer's chain is a bug.
+ */
+export const DEFAULT_CHAIN: ChainInfo = SEPOLIA
+
+/** Chains whose books can be listed. One subgraph each. */
+export const indexedChains = (): readonly ChainInfo[] =>
+  CHAINS.filter((c) => c.subgraph !== null)
+
+/** Chains with a contract whose offers cannot be listed from here. */
+export const deployedButUnindexed = (): readonly ChainInfo[] =>
+  CHAINS.filter((c) => c.deployment !== null && c.subgraph === null)
+
+/** True where an offer can actually be opened. */
+export const isTradable = (chainId: number | undefined): boolean =>
+  chainInfo(chainId)?.deployment != null
 
 export const chainInfo = (id: number | undefined): ChainInfo | undefined =>
   CHAINS.find((c) => c.chain.id === id)
+
+/**
+ * Test money and real money are different markets, and the book must never mix
+ * them.
+ *
+ * The design's "one book, not four" is about Ethereum, Optimism, Arbitrum and
+ * Base — mainnets a trader moves between with a single wallet prompt. Sepolia is
+ * in this app only because it is where the contract landed first, and a testnet
+ * offer surfacing in a mainnet book is not one market; it is play money priced
+ * beside real money.
+ *
+ * It compounds with the Monero pairing: a testnet chain yields a *stagenet*
+ * escrow address. Letting the realms share a book is how someone ends up looking
+ * at a stagenet address in a mainnet context.
+ */
+export type Realm = 'mainnet' | 'testnet'
+
+export const realmOf = (chainId: number | undefined): Realm =>
+  chainInfo(chainId)?.chain.testnet ? 'testnet' : 'mainnet'
+
+export const sameRealm = (a: number | undefined, b: number | undefined): boolean =>
+  realmOf(a) === realmOf(b)
+
+/** The indexed chains a given chain is allowed to see offers from. */
+export const visibleChains = (from: number | undefined): readonly ChainInfo[] =>
+  indexedChains().filter((c) => sameRealm(c.chain.id, from))
 
 export const chainLabel = (id: number | undefined): string =>
   chainInfo(id)?.label ?? (id === undefined ? 'Unknown chain' : `Chain ${id}`)
