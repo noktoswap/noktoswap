@@ -39,6 +39,17 @@
     "run_worker_first": ["/api/*"]
   },
 
+  /*
+   * Both of these were switched on by default, with the deploy warning that it
+   * was doing so "because it is not in your Wrangler file". Stated here so the
+   * behaviour is a decision rather than a default that could change under us:
+   * workers.dev is the demo URL, and preview URLs give every pushed version its
+   * own address. Note a preview carries the same secrets as production, which is
+   * the thing to weigh if this ever holds real value.
+   */
+  "workers_dev": true,
+  "preview_urls": true,
+
   "observability": {
     "enabled": true
   }

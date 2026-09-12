@@ -439,7 +439,16 @@ whole thing the proxy exists to prevent.
 **Connecting the repo has to be done in the dashboard**, because it needs the
 Cloudflare GitHub App authorized against the repo owner — an interactive OAuth
 grant on github.com that no Cloudflare token, API call, or wrangler command can
-perform. Once connected, every push to `main` builds and deploys.
+perform. Once connected, every push to `main` builds and deploys; it is live at
+[xmrp2p.pavel-f30.workers.dev](https://xmrp2p.pavel-f30.workers.dev).
+
+**The secrets are separate from the build variables**, and it is easy to set the
+wrong one. Build variables are visible to the *build*; this Worker reads
+`env.UNISWAP_API_KEY` at *runtime*, so they belong under the Worker's Settings →
+Variables and Secrets. With none set, the live site serves the app and loads the
+book — Subgraph Studio's `version/latest` endpoint answers unauthenticated — but
+every quote comes back `401 Unauthenticated api key or session`, because Uniswap
+has no such grace. That is the one credential the deployment cannot fake.
 
 ### Run it under workerd before trusting a deploy
 
