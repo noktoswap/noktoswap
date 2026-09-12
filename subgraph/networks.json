@@ -1,0 +1,26 @@
+{
+  "sepolia": {
+    "XMRP2P": {
+      "address": "0x67DB37c3be37B44c0506e5DF441437C83114bCd2",
+      "startBlock": 11670176
+    }
+  },
+  "mainnet": {
+    "XMRP2P": {
+      "address": "0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C",
+      "startBlock": 25962326
+    }
+  },
+  "base": {
+    "XMRP2P": {
+      "address": "0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C",
+      "startBlock": 51219297
+    }
+  },
+  "base-sepolia": {
+    "XMRP2P": {
+      "address": "0x4862839b11a6013FCC2A5f5AD2bA438Cac742d8C",
+      "startBlock": 46729575
+    }
+  }
+}
