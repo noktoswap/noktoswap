@@ -343,60 +343,14 @@ trade from the other side. Keeping "0.25" would silently ask for a different one
 
 "Post an offer" is a button under the widget rather than a mode tab for one
 reason: unlike a tab, it takes the amount you just typed with it. Both legs are
-seeded — the ETH amount *and* the readout, because the readout'''s rate is what a
+seeded — the ETH amount *and* the readout, because the readout's rate is what a
 maker prices against and on an empty book it is the only rate they have.
 
-The draft is separate from the widget'''s own input rather than the same signal,
+The draft is separate from the widget's own input rather than the same signal,
 because the two mean different things: on the widget an amount is a *filter*, in
 the form it is a *commitment*. Editing the form should not silently re-filter the
 book behind it. All three entry points seed — widget, results, book — and an empty
 amount bar seeds nothing rather than clearing a draft in progress.
-
-## Icons
-
-EVM tokens come from `assets.smold.app` (`/token/{chainId}/{address}/logo.svg`),
-chains from `/chain/{chainId}/logo.svg`. Three quirks the code handles rather than
-assumes, all found by watching it fail:
-
-- **Native currency is keyed by `0xEeee…EEeE`**, not the zero address this app and
-  Uniswap use. The zero address 404s.
-- **No testnet has token artwork** — the host mirrors `SmolDapp/tokenAssets`, which
-  has no testnet directories, native currency included. So a non-mainnet token
-  resolves straight to its mainnet twin by symbol rather than firing a request
-  that is known to fail. Chain logos *do* cover Sepolia.
-- **XMR gets no request at all.** It is not an EVM token, so there is no
-  (chain, address) to look up — and it is the one currency on every screen, which
-  makes a guaranteed 404 the wrong trade. The official Monero mark is inlined
-  (`spothq/cryptocurrency-icons`, CC0-1.0, so no attribution needed).
-
-`.dot` is the icon box, and it took two fixes to actually be one:
-
-**It has to be able to take a size.** It defaulted to `display: inline`, where
-width and height are ignored outright — so anywhere it was not already a flex
-child, the image fell back to the SVG's intrinsic size: 32px for most chain marks,
-48px for Optimism. Inside the chips this never showed, because a flex item is
-blockified; inside the book's grid cell, wrapped in a plain span, it did. It is
-`inline-flex` now, and a DOM test asserts every box carries the explicit px size
-its call site asked for.
-
-**It is a placeholder, not a frame.** Every mark this app loads — chain logos,
-token logos, the inlined Monero one — is already a self-contained circular badge
-with its own ground, so keeping the bordered grey circle behind one drew a ring
-around an already-round logo. `:has()` drops the border and background as soon as
-artwork is present, and brings them back if every candidate 404s and the element
-leaves the DOM. The border goes to `width: 0` rather than merely transparent —
-a transparent border still occupies its 2px under `border-box`, which would render
-the artwork two pixels short of the size requested.
-
-Every chip that names a currency draws it, and the book's Chain column is the mark
-rather than the word — the column is 100px and five logos are distinguishable,
-with the name kept on hover and in the accessibility tree, since an unlabelled
-glyph in a data table is a riddle.
-
-The bare `.dot` survives only as a genuine fallback: a token whose artwork failed,
-a wallet with no icon, a disconnected chain chip.
-
-## One picker, and why it inverts
 
 `selectCurrency(slot, currency)` in `state/swap.ts` states this as "put this
 currency on this slot" rather than as a flip, which is what keeps it correct:
