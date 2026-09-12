@@ -1,0 +1,38 @@
+{
+  "name": "@noktoswap/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run && vitest run --config vitest.dom.config.ts",
+    "test:domain": "vitest run",
+    "test:dom": "vitest run --config vitest.dom.config.ts",
+    "test:live": "vitest run --config vitest.live.config.ts"
+  },
+  "dependencies": {
+    "@kobalte/core": "^0.13.14",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@solidjs/router": "^1.0.0",
+    "@tanstack/solid-query": "^5.102.8",
+    "@wagmi/core": "^3.6.5",
+    "@wagmi/solid": "^0.0.35",
+    "lucide-solid": "^1.45.0",
+    "qr": "^0.7.0",
+    "solid-js": "^1.9.15",
+    "viem": "^2.56.3"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@types/node": "^22.20.2",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vite-plugin-solid": "^2.11.14",
+    "vitest": "^5.0.0"
+  }
+}

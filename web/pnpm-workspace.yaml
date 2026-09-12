@@ -1,0 +1,12 @@
+# pnpm 11 reads build-script policy from here rather than from package.json.
+#
+# esbuild needs its postinstall to place the platform binary Vite compiles with.
+# The rest are optional native accelerators pulled in transitively by the wallet
+# stack; the JS fallbacks are what actually run in a browser, so building them
+# buys nothing — and leaving the decision unmade makes `pnpm install` exit
+# non-zero, which blocks every script that runs a dep check first.
+allowBuilds:
+  esbuild: true
+  bufferutil: false
+  keccak: false
+  utf-8-validate: false

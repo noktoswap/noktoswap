@@ -1,0 +1,605 @@
+/*
+ * The lo-fi wireframe design system, carried over one-to-one.
+ *
+ * PLAN.md puts Hi-Fi below the cut line, so the wireframe *is* the spec: every
+ * token, class and measurement here is the value from the artboard source, not
+ * an interpretation of it. When Hi-Fi lands, this file is the only thing that
+ * has to change — nothing downstream hardcodes a colour or a font.
+ *
+ * The wireframe's conventions, which the components rely on:
+ *   solid ink button   = primary action
+ *   outlined button    = secondary
+ *   dashed border       = an exit, or an empty slot
+ *   left ink rule       = this row is yours / this is the one being recommended
+ */
+
+:root {
+  --paper: #f3f3f0;
+  --panel: #fbfbf9;
+  --box: #e8e8e4;
+  --box2: #deded9;
+  --line: #bcbcb5;
+  --line2: #8d8d86;
+  --ink: #2c2c29;
+  --muted: #7c7c74;
+  --scrim: #cdcdc7;
+
+  --hand: 'Patrick Hand', 'Comic Sans MS', cursive;
+  --mono: 'Courier Prime', 'Courier New', monospace;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--hand);
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+a:hover {
+  color: var(--muted);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+}
+input:focus {
+  outline: none;
+}
+input::placeholder {
+  color: var(--muted);
+}
+
+svg {
+  display: block;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ── type ─────────────────────────────────────────────────────────────── */
+
+.mono {
+  font-family: var(--mono);
+  font-size: 14px;
+}
+/* section heading — uppercase mono, used above every band and panel */
+.th {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* the dialog variant, a hair larger */
+.lbl {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cap {
+  font-size: 14px;
+  color: var(--muted);
+}
+.cap2 {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.h4 {
+  font-size: 18px;
+}
+.amt {
+  font-size: 34px;
+  line-height: 1;
+}
+.link {
+  text-decoration: underline;
+}
+.dim {
+  color: var(--muted);
+}
+
+/* ── surfaces ─────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+/* inset panel inside a card or dialog */
+.sub {
+  background: var(--box);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+/* the amount field on the swap widget */
+.field {
+  background: var(--box);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+/* single-line inset input */
+.input {
+  background: var(--box);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+}
+.note {
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 9px 12px;
+  text-align: center;
+  font-size: 15px;
+}
+
+/* ── controls ─────────────────────────────────────────────────────────── */
+
+.btn {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  font-size: 17px;
+}
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.btn-exit {
+  border-style: dashed;
+}
+.btn-small {
+  height: 36px;
+  font-size: 15px;
+  padding: 0 14px;
+  align-self: flex-start;
+}
+/* inline row action — sized by its text, not the row */
+.btn-inline {
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.btn-fill {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: var(--panel);
+}
+.chip-on {
+  border-color: var(--ink);
+  background: var(--box);
+}
+.pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid var(--line2);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.pill-urgent {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.dot {
+  /*
+   * `inline-flex`, not the default `inline`.
+   *
+   * Width and height are simply ignored on an inline box, so wherever a `.dot`
+   * was not already a flex child it collapsed to its content and the image fell
+   * back to the SVG's intrinsic size — 32px for most chain marks, 48px for
+   * Optimism. Inside the chips that never showed, because a flex item is
+   * blockified; inside the book's grid cell, wrapped in a plain span, it did.
+   * Every call site passes an explicit px size, so the box has to be able to take
+   * one.
+   */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line2);
+  flex: none;
+  overflow: hidden;
+  background: var(--box2);
+  padding: 0;
+}
+
+/*
+ * `.dot` is the *placeholder*, not a frame.
+ *
+ * Every mark this app loads — chain logos, token logos, the inlined Monero one —
+ * is already a self-contained circular badge with its own ground. Keeping the
+ * bordered grey circle behind one draws a ring around an already-round logo and
+ * shrinks it by the border width. So the decoration exists only while there is no
+ * artwork: `:has()` drops it the moment an image or an inline mark is present, and
+ * brings it back if every candidate 404s and the element is removed again.
+ */
+.dot:has(img),
+.dot:has(svg) {
+  /*
+   * `border-width: 0`, not merely a transparent colour — a transparent border
+   * still occupies its 2px under border-box, so the artwork would render two
+   * pixels short of the size the call site asked for.
+   */
+  border-width: 0;
+  background: none;
+}
+.dot img,
+.dot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Logos are square; never let a non-square source stretch one. */
+  object-fit: contain;
+}
+/* Kept for call sites that want the bare treatment regardless of load state. */
+.dot-bare {
+  border-color: transparent;
+  background: none;
+}
+
+/* ── rows ─────────────────────────────────────────────────────────────── */
+
+/* label/value row inside a .sub */
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+}
+.row .k {
+  color: var(--muted);
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.stack2 {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+/* an order in a list */
+.ord {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+/* …with a clock running on your side */
+.ord-live {
+  border-color: var(--line2);
+  border-left: 3px solid var(--ink);
+  padding-left: 11px;
+  background: var(--box);
+}
+
+/* an offer in the results list */
+.offer {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  width: 100%;
+}
+.offer-best {
+  border-color: var(--line2);
+  border-left: 3px solid var(--ink);
+  padding-left: 12px;
+}
+
+/* the book table — eight columns, per the artboard */
+.tgrid {
+  display: grid;
+  grid-template-columns: 118px 1.3fr 100px 1fr 0.9fr 0.85fr 0.9fr 104px;
+  gap: 12px;
+  align-items: center;
+}
+.tgrid .num {
+  text-align: right;
+}
+.mine {
+  border-left: 3px solid var(--ink);
+  padding-left: 9px !important;
+}
+
+/* ── page shell ───────────────────────────────────────────────────────── */
+
+.page {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: 26px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ── modal ────────────────────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--scrim) 82%, transparent);
+  z-index: 40;
+}
+
+/*
+ * Kobalte renders the overlay and the content as siblings, so the positioner is
+ * its own element above the tint. It is also the thing that has to stay
+ * interactive: it previously carried `pointer-events: none` on the theory that
+ * the overlay click had to pass through it, and that was wrong twice over —
+ * Kobalte dismisses on interact-outside-of-Content, which a click here already
+ * is, and an element that ignores pointer events also ignores the wheel. So a
+ * dialog taller than the viewport could not be scrolled at all, which read as
+ * the content being cropped.
+ *
+ * `align-items: flex-start` with `margin: auto` on the child, rather than
+ * `align-items: center`: centring a flex item clips the overflowing start edge of
+ * a scroll container and makes the top unreachable. Auto margins centre while it
+ * fits and collapse to zero when it does not.
+ */
+.scrim-layer {
+  background: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 41;
+}
+.dialog {
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 512px;
+  max-width: 100%;
+  margin: auto;
+  /* Never taller than the space the positioner gives it, so the header and the
+     primary action stay put and the body scrolls instead of the page. */
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
+.dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 4px;
+  flex: none;
+}
+
+/*
+ * The one scroll region inside a dialog. `min-height: 0` is what actually makes
+ * it work — a flex child defaults to `min-height: auto`, which refuses to shrink
+ * below its content and pushes the overflow outside the clipped parent instead of
+ * scrolling it.
+ */
+/* Pinned between the head and the scrolling body. */
+.dialog-sticky {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
+  /* Room for the focus ring on the first and last controls. */
+  margin: 0 -4px;
+  padding: 2px 4px;
+}
+.dialog-title {
+  font-size: 20px;
+}
+.icon-btn {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px;
+  display: flex;
+  flex: none;
+}
+
+/*
+ * Picker lists used to carry their own `max-height: 46dvh`, which meant two
+ * nested scroll regions and a magic fraction of the viewport that was wrong at
+ * most window sizes. The dialog body scrolls now, so this is a plain container.
+ */
+.scrolls {
+  display: flex;
+  flex-direction: column;
+}
+
+.tokrow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 2px;
+  width: 100%;
+}
+.tokrow:hover {
+  background: var(--box);
+}
+
+/* ── phone ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .page {
+    padding: 0 0 20px;
+    gap: 0;
+  }
+  /* the book's eight columns cannot survive 393pt — each offer becomes a card */
+  .tgrid {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .desktop-only {
+    display: none !important;
+  }
+  .dialog {
+    /* a picker or modal becomes a full-screen sheet, contents unchanged */
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: 0;
+    margin: 0;
+  }
+  .scrim-layer {
+    padding: 0;
+  }
+}
+
+@media (min-width: 721px) {
+  .phone-only {
+    display: none !important;
+  }
+}
+
+/* ── checkbox rows (Kobalte) ───────────────────────────────────────────── */
+
+/*
+ * Kobalte's Checkbox renders a real <input> and delegates the visuals to
+ * Control/Indicator. The input stays in the accessibility tree rather than being
+ * display:none'd, or screen readers and form semantics lose it.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.chainrow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 2px;
+  width: 100%;
+  cursor: pointer;
+}
+.chainrow:hover {
+  background: var(--box);
+}
+.chainrow-label {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* the square from the wireframe */
+.cbox {
+  width: 19px;
+  height: 19px;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  background: transparent;
+}
+.chainrow[data-checked] .cbox {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.chainrow:focus-within .cbox {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
