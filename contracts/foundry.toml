@@ -11,6 +11,20 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
 ]
 
+# Public endpoints, so `--rpc-url sepolia` works with no setup. Override any of
+# them by passing a full URL to --rpc-url instead.
+[rpc_endpoints]
+# publicnode refuses archive requests without a token, which breaks forge's
+# receipt polling after a broadcast. Official endpoints for the two mainnets.
+mainnet = "https://eth.drpc.org"
+sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
+base = "https://mainnet.base.org"
+base-sepolia = "https://base-sepolia-rpc.publicnode.com"
+arbitrum = "https://arbitrum-one-rpc.publicnode.com"
+arbitrum-sepolia = "https://arbitrum-sepolia-rpc.publicnode.com"
+optimism = "https://optimism-rpc.publicnode.com"
+optimism-sepolia = "https://optimism-sepolia-rpc.publicnode.com"
+
 [fuzz]
 runs = 256
 

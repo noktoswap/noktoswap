@@ -125,23 +125,53 @@ baseline:
 
 ## Day 3 (Fri 11th) — the app and the Uniswap entry
 
-- [ ] Offer book renders from the live subgraph.
-- [ ] [Token API](https://thegraph.com/docs/en/token-api/quick-start/) for wallet
-      balances — populates the swap token selector.
-- [ ] Exact required amounts read **from the contract**, not the subgraph
-      (`offer.deposit` for a BUY take, `offer.amount` for a SELL take). These gate
-      a payment and must not come from an indexer that can lag.
-- [ ] Swap-to-fund. **Constrain the token list** (USDC/USDT/DAI/WETH) — at this
-      hour count there is no time for open-ended route discovery, and a fixed list
-      means known routes.
-- [ ] Exact-**output** swaps targeting the required figure. Safe only because
-      `take` refunds excess (`AUDIT.md` H2) — do not let anyone "simplify" that to
-      an equality check.
-- [ ] `FEEDBACK.md`, written while the friction is fresh. Exact-output swaps into
-      native ETH to fund a time-locked escrow is genuinely unusual integration
-      friction and better material than most submissions will have.
+App scaffolded in `web/` — SolidJS + wagmi + solid-wagmi, built from the lo-fi
+designs. 38 checks green (31 domain, 7 render), typecheck and build clean.
+See [`web/README.md`](web/README.md).
 
-**Exit:** a user holding no ETH can fund and take an offer.
+- [x] Offer book renders from the live subgraph. All five query shapes verified
+      against the live endpoint. The book itself is still empty — see seeding.
+- [x] Token API for wallet balances — populates the swap token selector.
+      **Two corrections to the plan:** `token-api.thegraph.com` no longer
+      resolves (the service moved to `api.pinax.network`), and its network enum
+      is **mainnets only — no Sepolia**. So balances are genuinely unavailable on
+      the home chain, and the UI says so rather than rendering an empty list.
+- [x] Exact required amounts read **from the contract**, not the subgraph
+      (`offer.deposit` for a BUY take, `offer.amount` for a SELL take).
+      `lib/contract.ts` is the only path to a figure that reaches a `msg.value`.
+- [x] Swap-to-fund, token list constrained per chain. The wider routable set sits
+      behind `/swappable_tokens` for search, so the constraint shapes the happy
+      path without being the only way in.
+- [x] Exact-**output** swaps targeting the required figure. Slippage lands on the
+      *input* token, which is what makes this safe; the excess refund is the other
+      half. Commented at the call site so nobody "simplifies" it.
+- [x] **Escrow keypairs.** Not in the original plan and turned out to be
+      load-bearing: `take` and `claim` both need ed25519 material in the exact
+      encoding the contract checks. `pointToUint256` is pinned against four
+      vectors produced by running `Ed25519.scalarMultBaseCompressed` under forge.
+- [x] **Rate ladder with a Chainlink fallback.** Not in the plan; forced by the
+      empty book. The book's own figures still come first (exact offer → best
+      near → median), with Chainlink XMR/USD ÷ ETH/USD as the fourth rung so the
+      landing screen shows a real number instead of a dash. Note for the demo:
+      **the mainnet XMR/USD feed is decommissioned** — it reverts, and
+      `xmr-usd.data.eth` still points at it. The live pair is on Optimism.
+- [ ] `FEEDBACK.md`. The material is ready and sharper than expected — the swap
+      and the escrow **cannot** be one transaction (the Trading API pays the
+      swapper, and there is no hook), so funding an escrow is irreducibly a
+      two-transaction sequence. Plus Permit2 being required on some routes and
+      not others, with no way to ask in advance.
+
+**Exit:** ⚠️ a user holding no ETH can quote and fund, but cannot yet take —
+`take` needs a seeded book, and paying in a token needs Permit2 signing on routes
+that ask for it. Both are named in `web/README.md`.
+
+### Carried forward — the one gap worth stating plainly
+
+**Monero address derivation is not implemented**, deliberately. Everything the app
+submits is validated by the contract, so a mistake surfaces as a revert; an
+address is validated by nothing, and one wrong byte loses the coins. The key
+panels hand the verified halves to a real wallet instead. This is the highest
+value next piece of work and it wants test vectors before it wants code.
 
 ---
 
@@ -183,8 +213,8 @@ means not eligible.
 
 | Requirement | Where |
 |---|---|
-| Compose 2+ Graph products, or build on standardized schemas | D2 — Subgraph + Token API baseline; Substreams as upgrade |
-| Consume live data from a Graph provider (Studio or Graph Market) | D1 — real API key, fixtures disqualify |
+| Compose 2+ Graph products, or build on standardized schemas | D2/D3 — Subgraph + Token API, **both now wired in the client**; Substreams as upgrade |
+| Consume live data from a Graph provider (Studio or Graph Market) | D1 — real API key, fixtures disqualify. D3 — client queries it live, no offline fallback |
 | Not just querying one Subgraph without composition | D2 — explicit disqualifier |
 | *(optional)* contribute reusable Substreams modules | D2, only if Substreams lands |
 | Make the standards leverage clear — "what became easier" | D2 — README statement |
@@ -195,7 +225,7 @@ means not eligible.
 
 | Requirement | Where |
 |---|---|
-| Build on or integrate any part of the Uniswap stack | D3 |
+| Build on or integrate any part of the Uniswap stack | D3 — Trading API: `/quote` (EXACT_OUTPUT), `/check_approval`, `/swap`, `/swappable_tokens`. Code in `web/src/lib/uniswap.ts` |
 | Public GitHub repository, open-source | D4 |
 | `FEEDBACK.md` in the repo | D3 written, D4 final |
 | Uniswap Developer Feedback Form, linking `FEEDBACK.md` | D4 |
@@ -217,7 +247,7 @@ means not eligible.
 | Composability track open to continuity teams? | Everything Graph | **Ask Day 1.** Unresolved, worth $5,000 |
 | Revealed Monero keys in the public schema | D1 schema freeze | Index a `revealed` boolean, not the values. `CLAIMED`/`REFUNDED` publish key halves; a subgraph makes XMR↔EVM linkage a single query |
 | Substreams or baseline composition | D2 | Timebox Substreams to Day 2, ship baseline if it slips |
-| Token list for swap funding | D3 | Constrained. No time for route discovery |
+| Token list for swap funding | D3 | ✅ Constrained per chain, with `/swappable_tokens` behind search |
 
 ---
 
@@ -225,7 +255,19 @@ means not eligible.
 
 - The Graph AI tracks — deliberate.
 - A third partner prize — the slot is free but the hours aren't.
-- Multi-chain deployment. Fragmenting a live offer book across chains with no
-  takers is a real cost against a $5,000 upside.
+- ~~Multi-chain deployment.~~ Partly done, and the split is deliberate. The
+  **contracts** are on mainnet, Base and Base Sepolia at one CREATE3 address
+  (`0x4862839b…`, identical runtime codehash on all three). The **book** is not:
+  indexing and the client stay on Sepolia, because fragmenting a book with no
+  takers across chains is the actual cost, and repointing the subgraph this close
+  to the deadline risks the $5,000 entry for no gain.
+
+  Two things carried forward. The CREATE3 deployer key has been pasted into a
+  terminal session, and a permissioned salt means whoever holds it can put
+  arbitrary code at `0x4862839b…` on any chain **not yet deployed to** — mainnet
+  and Base are locked, Arbitrum and Optimism are not. Rotate the deployer before
+  the protocol holds real value. The same key is also the owner of all three
+  deployments, holding `setParameters` and `recover`; `transferOwnership` is
+  available, so that half is fixable without redeploying.
 - SELL-offer griefing and the stalled-EVM-side case (`AUDIT.md`, "Noted, not
   changed"). Both need economic design, not a patch.
