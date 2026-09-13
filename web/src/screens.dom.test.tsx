@@ -117,7 +117,7 @@ describe('the screens mount with no data', () => {
     setPayInput('')
     mount(Find)
 
-    const payEth = screen.getByLabelText('Amount to pay in ETH') as HTMLInputElement
+    const payEth = screen.getByLabelText('Amount to pay, in ETH') as HTMLInputElement
     expect(payEth.tagName).toBe('INPUT')
     // And the receive side is a readout, not a second field.
     expect(screen.getByLabelText(/^Amount to receive in XMR/).tagName).not.toBe('INPUT')
@@ -126,7 +126,7 @@ describe('the screens mount with no data', () => {
     await Promise.resolve()
 
     // Now paying XMR — still an input, and now labelled in XMR.
-    const payXmr = screen.getByLabelText('Amount to pay in XMR') as HTMLInputElement
+    const payXmr = screen.getByLabelText('Amount to pay, in XMR') as HTMLInputElement
     expect(payXmr.tagName).toBe('INPUT')
     expect(screen.getByLabelText(/^Amount to receive in ETH/).tagName).not.toBe('INPUT')
 

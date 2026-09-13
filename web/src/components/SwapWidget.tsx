@@ -237,6 +237,10 @@ export const SwapWidget = (): JSX.Element => {
 
   const makerSettled = useSettledCount(() => matching().best?.offer.owner)
 
+  /** Paying the ETH leg with an ERC-20, which Uniswap swaps in on the way. */
+  const fundsWithToken = () =>
+    payLeg() === 'eth' && payCurrency().symbol !== 'ETH' && payCurrency().address !== null
+
   /*
    * Typing an amount is the moment the rate becomes a decision rather than a
    * decoration, so it asks the feed for a fresh round — debounced, because "0.05"
@@ -309,10 +313,25 @@ export const SwapWidget = (): JSX.Element => {
               placeholder="0"
               value={payInput()}
               onInput={(event) => onAmountTyped(event.currentTarget.value)}
-              aria-label={`Amount to pay in ${payCurrency().symbol}`}
+              aria-label={`Amount to pay, in ${payLeg() === 'eth' ? 'ETH' : 'XMR'}`}
             />
+            <span class="mono cap" style={{ 'white-space': 'nowrap' }}>
+              {payLeg() === 'eth' ? 'ETH' : 'XMR'}
+            </span>
             <CurrencyChip currency={payCurrency()} slot="pay" />
           </div>
+          {/*
+            An offer has two legs, ETH and XMR, and that is what the contract
+            stores. A selected ERC-20 funds the ETH leg — the escrow is swapped
+            into ETH first — so the number here is ETH whatever token pays for it.
+            Without the unit this read as "1 USDC", and the receive box answered
+            with the price of one ETH.
+          */}
+          <Show when={fundsWithToken()}>
+            <span class="cap2">
+              in ETH — the offer's leg. {payCurrency().symbol} is what funds it.
+            </span>
+          </Show>
         </div>
 
         <div style={{ display: 'flex', 'justify-content': 'center', margin: '-16px 0' }}>
