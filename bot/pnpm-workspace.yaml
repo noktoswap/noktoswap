@@ -1,0 +1,13 @@
+# Mirrors web/pnpm-workspace.yaml, and for the same reasons.
+#
+# `packages` is named because a workspace file without it has been rejected by at
+# least one CI image ("packages field missing or empty"), and a single-package
+# root is what this is.
+packages:
+  - .
+
+# pnpm 11 reads build-script policy from here rather than from package.json.
+# tsx runs on esbuild, whose postinstall places the platform binary — without it
+# every command in this package fails to start.
+allowBuilds:
+  esbuild: true
