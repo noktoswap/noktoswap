@@ -1,5 +1,5 @@
 import { useNavigate } from '@solidjs/router'
-import { Show, createMemo, type JSX } from 'solid-js'
+import { Show, createMemo, onCleanup, type JSX } from 'solid-js'
 import { chainLabel } from '../lib/chains'
 import {
   formatEth,
@@ -9,7 +9,6 @@ import {
   shortAddress,
 } from '../lib/format'
 import { closestBySize, legAmount, matchOffers, receiveAmountFor, type Leg } from '../lib/offers'
-import { FEED_NETWORK_LABEL } from '../lib/oracle'
 import { XMR, isXmr, type Currency } from '../lib/tokens'
 import { useApp, useSettledCount } from '../state/app'
 import { openCreate, openOrder, openSettings, openTokenPicker } from '../state/modals'
@@ -172,7 +171,7 @@ export const SwapWidget = (): JSX.Element => {
             when={app.oracleRate() !== null}
             fallback={<>no rate available — the book is thin and the feed is unreachable</>}
           >
-            market price · Chainlink on {FEED_NETWORK_LABEL}
+            market price
             <Show when={app.rateStale()}> · last round is stale</Show>
             <Show when={app.openCount() > 0}>
               {' '}
@@ -238,6 +237,20 @@ export const SwapWidget = (): JSX.Element => {
 
   const makerSettled = useSettledCount(() => matching().best?.offer.owner)
 
+  /*
+   * Typing an amount is the moment the rate becomes a decision rather than a
+   * decoration, so it asks the feed for a fresh round — debounced, because "0.05"
+   * is four keystrokes and one intention, and each read is two contract calls.
+   */
+  let rateNudge: ReturnType<typeof setTimeout> | undefined
+  const onAmountTyped = (value: string) => {
+    setPayInput(value)
+    clearTimeout(rateNudge)
+    if (value.trim() === '') return
+    rateNudge = setTimeout(() => app.refetchRate(), 400)
+  }
+  onCleanup(() => clearTimeout(rateNudge))
+
   return (
     <div
       style={{
@@ -295,7 +308,7 @@ export const SwapWidget = (): JSX.Element => {
               inputmode="decimal"
               placeholder="0"
               value={payInput()}
-              onInput={(event) => setPayInput(event.currentTarget.value)}
+              onInput={(event) => onAmountTyped(event.currentTarget.value)}
               aria-label={`Amount to pay in ${payCurrency().symbol}`}
             />
             <CurrencyChip currency={payCurrency()} slot="pay" />

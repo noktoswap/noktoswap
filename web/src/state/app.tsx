@@ -66,6 +66,14 @@ type AppState = {
   refetchBook: () => void
   myOrders: Accessor<Offer[]>
   refetchMyOrders: () => void
+  /**
+   * Ask the feed for a new round now.
+   *
+   * Called when someone types an amount: that is the moment the rate stops being
+   * decoration and becomes the basis of a decision, and it is the one moment worth
+   * spending a request on regardless of the polling interval.
+   */
+  refetchRate: () => void
   /** Settled-trade counts, keyed by lowercase address. Countable on-chain. */
   settled: Accessor<Map<string, number>>
   /** Median XMR/ETH across every open offer on every chain, or null if none. */
@@ -181,13 +189,21 @@ export const AppProvider = (props: { children: JSX.Element }): JSX.Element => {
    * only when the book is empty. Two reasons: the create form wants a spot figure
    * to price against even when the book *can* answer, and a query that appears
    * and disappears with the book would refetch every time the book emptied.
-   * One cheap read pair on a 20-minute stale window.
+   * Two cheap reads, kept fresh enough to act on.
+   *
+   * These windows were 20 and 10 minutes, chosen against the XMR/USD feed's 1200s
+   * heartbeat — but a heartbeat is the *longest* a feed waits, not the shortest.
+   * Either side can also publish on a price deviation, and ETH/USD moves far more
+   * often than XMR/USD, so the quotient this app actually quotes can change within
+   * a block while a ten-minute cache calls it fresh. Somebody reading a rate is
+   * usually about to act on it, and a stale quote is the one number here that turns
+   * into a worse trade rather than a refresh.
    */
   const oracleQuery = useQuery(() => ({
     queryKey: ['xmr-per-eth'],
     queryFn: fetchXmrPerEth,
-    refetchInterval: 1200_000,
-    staleTime: 600_000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
     retry: 1,
   }))
 
@@ -221,6 +237,7 @@ export const AppProvider = (props: { children: JSX.Element }): JSX.Element => {
     refetchBook: () => void bookQuery.refetch(),
     myOrders,
     refetchMyOrders: () => void myOrdersQuery.refetch(),
+    refetchRate: () => void oracleQuery.refetch(),
     settled: () => settledQuery.data ?? new Map(),
     realm: () => realmOf(actionChainId()),
     bookRate,

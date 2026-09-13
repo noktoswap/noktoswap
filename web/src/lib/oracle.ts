@@ -135,4 +135,3 @@ export const fetchXmrPerEth = async (): Promise<OracleRate> => {
   }
 }
 
-export const FEED_NETWORK_LABEL = 'Optimism'

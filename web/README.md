@@ -83,7 +83,7 @@ rate, in whichever direction is needed.
 | 1 | The offer that is exactly your size | its real numbers, not muted |
 | 2 | Best offer within ±10% | an estimate at that rate, muted |
 | 3 | Median across every open offer | an estimate, muted |
-| 4 | Chainlink XMR/USD ÷ ETH/USD | an estimate, muted, feed named |
+| 4 | Chainlink XMR/USD ÷ ETH/USD | an estimate, muted |
 
 Rungs 1–3 are the book's own figures, and the design argued hard for stopping
 there: what a maker competes with is the people already offering, not a spot
@@ -96,6 +96,15 @@ the widget, so the create form recomputed a bare book median and showed
 `Market ~—` on an empty book while the widget two clicks away showed a figure.
 One definition, read by both; the create form's market line also says when the
 number came from Chainlink, and clicking it adopts that rate.
+
+**The feed is read often enough to act on.** The polling window was twenty minutes
+against the XMR/USD feed's 1200s heartbeat — but a heartbeat is the longest a feed
+waits, not the shortest: either side may publish on a deviation, and ETH/USD moves
+far more than XMR/USD, so the quotient this app quotes can change within a block
+while a ten-minute cache calls it fresh. It now refreshes every 30s, and typing an
+amount asks for a round immediately, debounced. That is the moment a rate stops
+being decoration, and a stale one is the single number here that becomes a worse
+trade rather than a refresh.
 
 **Chainlink's mainnet XMR/USD proxy is dead.** `0xFA66458C…` — still what
 `xmr-usd.data.eth` resolves to — reverts on every call, consistent with XMR being
