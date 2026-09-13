@@ -6,7 +6,7 @@ it opens.
 ```shell
 pnpm install
 export BOT_PRIVATE_KEY=0x…              # 32 bytes of hex, never a flag
-pnpm bot status                         # balances, parameters, live positions
+pnpm bot status                         # mainnet by default; --testnet for Sepolia
 pnpm bot quote --mid 480                # what it would post, and why
 pnpm bot make --live --max-offer-eth 0.01 --max-total-eth 0.05
 pnpm bot run                            # the same, on a loop
@@ -75,7 +75,7 @@ exactly the moment it matters.
 |---|---|
 | *(default)* | dry run — every write simulated, nothing sent |
 | `--live` | actually send transactions |
-| `--allow-mainnet` | required on a mainnet; testnets need no flag |
+| `--testnet` | Sepolia instead of the default, which is **mainnet** |
 | `--max-offer-eth` | cap per offer, **required** with `--live` |
 | `--max-total-eth` | cap on total exposure, **required** with `--live` |
 

@@ -43,13 +43,13 @@ Safety, because this program spends money unattended:
 
   --dry-run                 simulate every write, send nothing  [default]
   --live                    actually send transactions
-  --allow-mainnet           required on a mainnet; testnets need no flag
   --max-offer-eth <eth>     cap per offer   (required with --live)
   --max-total-eth <eth>     cap on total exposure (required with --live)
 
 Market:
 
-  --chain <id>              default 11155111 (Sepolia)
+  --testnet                 Sepolia instead of the default, which is mainnet
+  --chain <id>              any deployed chain by id; default 1 (Ethereum)
   --spread <fraction>       0.02 = quote ±2% around mid  [default 0.02]
   --depth <n>               offers per side  [default 2]
   --mid <rate>              XMR per ETH; overrides the book median

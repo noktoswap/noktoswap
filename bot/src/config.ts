@@ -1,6 +1,6 @@
 import { privateKeyToAccount } from 'viem/accounts'
 import type { Address, Hex } from 'viem'
-import { CHAINS, chainInfo, realmOf, type ChainInfo } from '../../web/src/lib/chains'
+import { CHAINS, chainInfo, type ChainInfo } from '../../web/src/lib/chains'
 
 /**
  * What the bot is allowed to do, and with how much.
@@ -11,9 +11,12 @@ import { CHAINS, chainInfo, realmOf, type ChainInfo } from '../../web/src/lib/ch
  * mistyped amount costs the amount. The defaults are therefore the safe ones and
  * every dangerous thing is opt-in:
  *
- *   - dry run unless `--live`
- *   - testnet unless `--allow-mainnet`
+ *   - dry run unless `--live`, and a dry run still simulates against the real chain
  *   - a per-offer cap and a total-exposure cap, both mandatory in live mode
+ *
+ * The chain default is mainnet, deliberately: a tool that defaults to a testnet
+ * trains you to pass a flag you will later forget to drop. `--testnet` is the
+ * switch, and the two caps are what actually stand in the way of a loss.
  *
  * Nothing here reads a key from a command-line flag. Argv is visible in `ps` and
  * lands in shell history, so keys come from the environment only.
@@ -102,13 +105,29 @@ const DEFAULTS = {
   spread: 0.02,
   depth: 2,
   interval: 60,
-  chainId: 11155111,
+  /*
+   * Mainnet. The book that matters is the one with real money in it, and a tool
+   * whose default is a testnet quietly trains you to pass a flag you will then
+   * forget to drop. `--testnet` switches to Sepolia; `--chain <id>` names any
+   * deployed chain explicitly.
+   *
+   * What still stands between this default and a loss is the pair of gates below:
+   * nothing is sent without `--live`, and `--live` refuses to start without both
+   * exposure caps.
+   */
+  chainId: 1,
+  testnetChainId: 11155111,
 }
 
 export const resolveConfig = (flags: Map<string, string>): Config => {
   const mode: Mode = flags.get('live') === 'true' ? 'live' : 'dry-run'
 
-  const chainId = Number(flags.get('chain') ?? DEFAULTS.chainId)
+  const explicit = flags.get('chain')
+  const wantsTestnet = flags.get('testnet') === 'true'
+  if (explicit && wantsTestnet) {
+    throw new ConfigError('--chain and --testnet both name a chain; pass one')
+  }
+  const chainId = Number(explicit ?? (wantsTestnet ? DEFAULTS.testnetChainId : DEFAULTS.chainId))
   const chain = chainInfo(chainId)
   if (!chain) {
     const known = CHAINS.map((c) => `${c.chain.id} (${c.label})`).join(', ')
@@ -116,17 +135,6 @@ export const resolveConfig = (flags: Map<string, string>): Config => {
   }
   if (!chain.deployment) {
     throw new ConfigError(`${chain.label} has no contract deployed — nothing to trade against`)
-  }
-
-  /*
-   * The realm gate. Sepolia loses play money; mainnet loses real money, and the
-   * escrow it pairs with is real Monero. A flag is a low bar, but it is a
-   * deliberate one, and it has to be crossed in the same command that spends.
-   */
-  if (realmOf(chain.chain.id) === 'mainnet' && flags.get('allow-mainnet') !== 'true') {
-    throw new ConfigError(
-      `${chain.label} is a mainnet and real money. Pass --allow-mainnet to confirm you mean it.`,
-    )
   }
 
   const rawKey = env('BOT_PRIVATE_KEY')
