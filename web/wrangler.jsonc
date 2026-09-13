@@ -2,10 +2,22 @@
   "$schema": "https://json.schemastore.org/wrangler.json",
 
   /*
-   * The URL is `<name>.<account-subdomain>.workers.dev`, and the account
-   * subdomain is `noktoswap`, so this reads app.noktoswap.workers.dev. Renaming
-   * it creates a new service rather than moving the old one — `xmrp2p` is the
-   * predecessor and can be deleted once auto-deploy is confirmed against this.
+   * The URL is `<name>.<account-subdomain>.workers.dev`, and the subdomain is
+   * `noktoswap`, so this reads app.noktoswap.workers.dev. `xmrp2p` was the
+   * previous iteration of this project and does not belong in either half.
+   *
+   * This name must agree with the Worker the Workers Builds trigger is bound to,
+   * and that binding does not come from here — a mismatch is overridden, loudly
+   * in the log and silently as far as the URL is concerned:
+   *
+   *   Failed to match Worker name. Your config file is using the Worker name
+   *   "app", but the CI system expected "xmrp2p". Overriding using the CI
+   *   provided Worker name.
+   *
+   * `PATCH /builds/triggers/{uuid}` cannot repoint it either — it takes the
+   * commands, branches and root directory, but no script id. So the trigger was
+   * recreated against this Worker rather than the config bent to match the
+   * trigger.
    */
   "name": "app",
 
