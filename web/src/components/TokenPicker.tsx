@@ -14,7 +14,7 @@ import {
   toggleTokenNetwork,
   tokenNetworks,
 } from '../state/filters'
-import { closeAllModals, openChainPicker } from '../state/modals'
+import { closeModal, openChainPicker } from '../state/modals'
 import { Modal } from './Modal'
 import { ChainIcon, TokenIcon, TokenIconFor } from './TokenIcon'
 import { Chevron, Search } from './icons'
@@ -107,9 +107,19 @@ export const TokenPicker = (props: {
 
   const pick = (currency: Currency) => {
     props.onPick(currency)
-    // The picker's whole question is answered — dismiss the stack rather than
-    // popping back to whatever opened it.
-    closeAllModals()
+    /*
+     * Pop one level, back to whatever opened this — which is the entire reason the
+     * modal stack exists.
+     *
+     * This used to clear the stack, on the theory that answering the picker's
+     * question ends the interaction. It does from the trade widget, where the
+     * picker sits directly on a page. But it is opened from inside two other
+     * modals as well — the create-offer form and the order dialog's payout row —
+     * and there clearing the stack threw away the form the reader was part-way
+     * through filling in. The currency had in fact been applied; the only way to
+     * see that was to open the form again.
+     */
+    closeModal()
   }
 
   const matches = (symbol: string, name: string, address?: string | null) => {

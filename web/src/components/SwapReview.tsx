@@ -19,6 +19,7 @@ import {
   checkApproval,
   createSwap,
   describeRoute,
+  isTransientQuoteError,
   permitTypedData,
   quoteFunding,
   type FundingQuote,
@@ -147,7 +148,10 @@ export const SwapReview = (): JSX.Element => {
           slippageTolerance: maxSlippage() ?? undefined,
         }),
       enabled: Boolean(needsSwap() && who && required && required > 0n),
-      retry: 0,
+      // Retry only what the service says is worth retrying; a real
+      // no-route answer is a fact about the market, not a hiccup.
+      retry: (count: number, error: unknown) => count < 2 && isTransientQuoteError(error),
+      retryDelay: 600,
     }
   })
 
@@ -168,7 +172,10 @@ export const SwapReview = (): JSX.Element => {
           amount: ceiling as bigint,
         }),
       enabled: Boolean(needsSwap() && who && ceiling),
-      retry: 0,
+      // Retry only what the service says is worth retrying; a real
+      // no-route answer is a fact about the market, not a hiccup.
+      retry: (count: number, error: unknown) => count < 2 && isTransientQuoteError(error),
+      retryDelay: 600,
     }
   })
 

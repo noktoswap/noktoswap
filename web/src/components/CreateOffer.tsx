@@ -13,7 +13,7 @@ import {
   tryParseEth,
   tryParseXmr,
 } from '../lib/format'
-import { describeRoute, quoteFunding, type FundingQuote } from '../lib/uniswap'
+import { describeRoute, isTransientQuoteError, quoteFunding, type FundingQuote } from '../lib/uniswap'
 import { XMR, type Currency } from '../lib/tokens'
 import { useApp } from '../state/app'
 import { closeModal, openReview, openSettings, openTokenPicker } from '../state/modals'
@@ -117,7 +117,10 @@ export const CreateOffer = (): JSX.Element => {
         }),
       enabled: Boolean(who && token && token !== NATIVE && required && required > 0n),
       refetchInterval: QUOTE_REFRESH_MS,
-      retry: 0,
+      // Retry only what the service says is worth retrying; a real
+      // no-route answer is a fact about the market, not a hiccup.
+      retry: (count: number, error: unknown) => count < 2 && isTransientQuoteError(error),
+      retryDelay: 600,
     }
   })
 
@@ -162,6 +165,22 @@ export const CreateOffer = (): JSX.Element => {
   const sellSide = () => (direction() === 'eth-to-xmr' ? payingToken() : XMR)
   const buySide = () => (direction() === 'eth-to-xmr' ? XMR : payingToken())
 
+  /*
+   * The unit each amount box is actually in.
+   *
+   * An offer has two legs, ETH and XMR, and that is what the contract stores. A
+   * selected ERC-20 is how the *ETH leg gets funded* — the escrow is swapped into
+   * ETH first — so the number typed here is always ETH, whatever token is chosen
+   * to pay with.
+   *
+   * The currency chip alone did not say that, and read as though it did: with USDC
+   * selected, typing 1 and pressing the market button produced 4.68 XMR, which is
+   * the price of one *ETH*. The figure was right for the offer and wrong for
+   * everything the screen appeared to claim, so the box now names its own unit.
+   */
+  const sellUnit = () => (direction() === 'eth-to-xmr' ? 'ETH' : 'XMR')
+  const buyUnit = () => (direction() === 'eth-to-xmr' ? 'XMR' : 'ETH')
+
   return (
     <Modal
       title="Create offer"
@@ -187,12 +206,20 @@ export const CreateOffer = (): JSX.Element => {
                 ? setEthText(event.currentTarget.value)
                 : setXmrText(event.currentTarget.value)
             }
-            aria-label="Amount to sell"
+            aria-label={`Amount to sell, in ${sellUnit()}`}
           />
           {/* The wireframe shows a fiat figure here. There is no honest source
               for it on this leg — the quote prices gas in USD but not the token
-              amount — so it is left out rather than estimated. */}
+              amount — so the unit goes here instead, which is the thing that was
+              actually missing. */}
+          <span class="mono cap">{sellUnit()}</span>
         </div>
+
+        <Show when={needsSwap()}>
+          <span class="cap2" style={{ 'margin-top': '-4px' }}>
+            Amount is in ETH — the offer's leg. {payingToken().symbol} is what funds it.
+          </span>
+        </Show>
 
         <Show when={needsSwap()}>
           {/* Paying in a token. The escrow figure is fixed; the spend is capped. */}
@@ -247,8 +274,9 @@ export const CreateOffer = (): JSX.Element => {
                 ? setXmrText(event.currentTarget.value)
                 : setEthText(event.currentTarget.value)
             }
-            aria-label="Amount to buy"
+            aria-label={`Amount to buy, in ${buyUnit()}`}
           />
+          <span class="mono cap">{buyUnit()}</span>
         </div>
 
         <div style={{ 'margin-top': '4px' }}>Rate</div>

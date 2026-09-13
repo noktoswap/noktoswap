@@ -43,6 +43,27 @@ export class UniswapApiError extends Error {
   }
 }
 
+/**
+ * Is this failure worth trying again?
+ *
+ * The routing service fails two ways that look alike from here and are not. A
+ * genuine "no route with sufficient liquidity was found for this pair" is a fact
+ * about the market and retrying it wastes the reader's time. But it also returns
+ * "a routing dependency timed out or failed; the request may succeed if retried",
+ * which is the service telling you plainly that the answer is not final —
+ * observed on a DAI/ETH pair on Base, where liquidity is obviously not the
+ * problem.
+ *
+ * Both arrive as 404s, so the status alone cannot separate them and the detail
+ * has to be read. Anything 5xx is transient by definition.
+ */
+export const isTransientQuoteError = (error: unknown): boolean => {
+  if (!(error instanceof UniswapApiError)) return false
+  if (error.status >= 500) return true
+  const detail = (error.detail ?? '').toLowerCase()
+  return detail.includes('timed out') || detail.includes('may succeed if retried')
+}
+
 const post = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(`${ENDPOINT}${path}`, {
     method: 'POST',
