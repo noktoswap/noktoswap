@@ -88,6 +88,21 @@ export const CreateOffer = (): JSX.Element => {
   const needsSwap = () => payingToken().symbol !== 'ETH' && payingToken().address !== null
 
   /**
+   * A funding token on a different chain than the offer cannot fund it.
+   *
+   * The escrow lives on `actionChainId`, which follows the connected wallet, and
+   * the swap has to land native ETH *on that chain* — so the token has to be there
+   * too. The picker can offer tokens across every selected network, and selecting
+   * one from elsewhere used to be sent to Uniswap as an address that does not exist
+   * on the requested chain. The reply is "No route with sufficient liquidity was
+   * found for this pair", which is true and reads as though the market were at
+   * fault rather than the request.
+   */
+  const fundingChain = () => payingToken().chainId
+  const chainMismatch = () =>
+    needsSwap() && fundingChain() !== null && fundingChain() !== app.actionChainId()
+
+  /**
    * The exact-output quote. The escrow needs a precise ETH figure, so the ETH is
    * the fixed leg and the token spend is bounded:
    *   maximum sold = expected × (1 + slippage)
@@ -227,6 +242,17 @@ export const CreateOffer = (): JSX.Element => {
             <span class="stack" style={{ gap: '3px' }}>
               <span style={{ 'font-size': '16px' }}>Swapped to ETH first</span>
               <Show
+                when={!chainMismatch()}
+                fallback={
+                  <span class="cap">
+                    {payingToken().symbol} is on {chainLabel(fundingChain() ?? undefined)}, but this
+                    offer would be opened on {chainLabel(app.actionChainId())}. Switch your wallet to{' '}
+                    {chainLabel(fundingChain() ?? undefined)}, or pick a token on{' '}
+                    {chainLabel(app.actionChainId())}.
+                  </span>
+                }
+              >
+              <Show
                 when={funding.data}
                 fallback={
                   <span class="cap">
@@ -247,6 +273,7 @@ export const CreateOffer = (): JSX.Element => {
                     . Anything left over stays in your wallet.
                   </span>
                 )}
+              </Show>
               </Show>
             </span>
           </div>

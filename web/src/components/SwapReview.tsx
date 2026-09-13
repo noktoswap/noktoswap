@@ -123,6 +123,17 @@ export const SwapReview = (): JSX.Element => {
   const token = () => evmCurrency()
   const needsSwap = () => token().address !== null && token().address !== NATIVE
 
+  /**
+   * Same constraint as the create form: the escrow is on `actionChainId` and the
+   * swap must land ETH there, so a funding token from another chain cannot pay for
+   * it. Sent anyway, it becomes an address that does not exist on the requested
+   * chain, and Uniswap answers "no route ... for this pair" — blaming the market
+   * for a malformed request.
+   */
+  const fundingChain = () => token().chainId
+  const chainMismatch = () =>
+    needsSwap() && fundingChain() !== null && fundingChain() !== app.actionChainId()
+
   const ethAmount = () => tryParseEth(draftEth())
   const xmrAmount = () => tryParseXmr(draftXmr())
 
@@ -147,7 +158,7 @@ export const SwapReview = (): JSX.Element => {
           swapper: who as `0x${string}`,
           slippageTolerance: maxSlippage() ?? undefined,
         }),
-      enabled: Boolean(needsSwap() && who && required && required > 0n),
+      enabled: Boolean(needsSwap() && !chainMismatch() && who && required && required > 0n),
       // Retry only what the service says is worth retrying; a real
       // no-route answer is a fact about the market, not a hiccup.
       retry: (count: number, error: unknown) => count < 2 && isTransientQuoteError(error),
@@ -217,6 +228,11 @@ export const SwapReview = (): JSX.Element => {
     // These were a bare `return`, which made the button a silent no-op — the
     // worst possible response to a click, and indistinguishable from a bug.
     if (!who) return setError('Connect a wallet first.')
+    if (chainMismatch()) {
+      return setError(
+        `${token().symbol} is on ${chainLabel(fundingChain() ?? undefined)}, but this order opens on ${chainLabel(app.actionChainId())}. Switch your wallet, or pick a token on ${chainLabel(app.actionChainId())}.`,
+      )
+    }
     if (xmr === null) return setError('Set the XMR amount before posting.')
     if (value === null) {
       return setError('Still reading the market parameters from the contract — try again in a moment.')
