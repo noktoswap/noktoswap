@@ -6,10 +6,17 @@
       <stop offset="1" stop-color="#090F24"/>
     </linearGradient>
 
-    <linearGradient id="moon" x1="110" y1="100" x2="250" y2="420" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F2F7FF"/>
-      <stop offset="0.45" stop-color="#C6D8F5"/>
-      <stop offset="1" stop-color="#7F9AD4"/>
+    <linearGradient id="discUpper" x1="60" y1="90" x2="300" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F6F9FF"/>
+      <stop offset="1" stop-color="#C2D5F3"/>
+    </linearGradient>
+    <linearGradient id="discLower" x1="60" y1="90" x2="300" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#BDD1F0"/>
+      <stop offset="1" stop-color="#7B98CF"/>
+    </linearGradient>
+    <linearGradient id="moneroM" x1="60" y1="120" x2="280" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#37508A"/>
+      <stop offset="1" stop-color="#1B2950"/>
     </linearGradient>
 
     <linearGradient id="ethTop" x1="0" y1="0" x2="0.9" y2="1">
@@ -21,45 +28,52 @@
       <stop offset="1" stop-color="#5E93F7"/>
     </linearGradient>
 
-    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#6FA8FF" stop-opacity="0.45"/>
-      <stop offset="0.6" stop-color="#6FA8FF" stop-opacity="0.10"/>
+    <radialGradient id="moonGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#A9C4FF" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#A9C4FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ethGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6FA8FF" stop-opacity="0.30"/>
       <stop offset="1" stop-color="#6FA8FF" stop-opacity="0"/>
     </radialGradient>
 
-    <radialGradient id="moonGlow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#A9C4FF" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#A9C4FF" stop-opacity="0"/>
-    </radialGradient>
-
-    <mask id="crescent">
+    <!-- The moon phase. The terminator is the edge of the shadow circle, so the
+         Monero marking is cut by it exactly as a real marking would be — the
+         glyph runs into the dark side rather than stopping politely at it. -->
+    <mask id="phase">
       <rect width="512" height="512" fill="black"/>
-      <circle cx="240" cy="258" r="158" fill="white"/>
-      <circle cx="330" cy="208" r="150" fill="black"/>
+      <circle cx="240" cy="256" r="172" fill="white"/>
+      <circle cx="447" cy="230" r="178" fill="black"/>
     </mask>
   </defs>
 
   <rect width="512" height="512" rx="112" fill="url(#night)"/>
 
-  <!-- stars -->
   <g fill="#DCE8FF">
-    <circle cx="112" cy="96" r="3.4" opacity="0.85"/>
-    <circle cx="158" cy="58" r="2.1" opacity="0.5"/>
-    <circle cx="402" cy="96" r="2.6" opacity="0.7"/>
-    <circle cx="440" cy="168" r="1.9" opacity="0.45"/>
-    <circle cx="424" cy="396" r="3.1" opacity="0.75"/>
-    <circle cx="96" cy="424" r="2.2" opacity="0.5"/>
-    <circle cx="70" cy="300" r="1.8" opacity="0.4"/>
+    <circle cx="106" cy="88" r="3.2" opacity="0.8"/>
+    <circle cx="152" cy="50" r="2" opacity="0.45"/>
+    <circle cx="404" cy="94" r="2.6" opacity="0.7"/>
+    <circle cx="450" cy="180" r="1.9" opacity="0.45"/>
+    <circle cx="410" cy="412" r="3" opacity="0.7"/>
+    <circle cx="86" cy="412" r="2.2" opacity="0.5"/>
+    <circle cx="58" cy="296" r="1.7" opacity="0.38"/>
   </g>
 
-  <circle cx="240" cy="258" r="188" fill="url(#moonGlow)"/>
-  <circle cx="334" cy="246" r="160" fill="url(#glow)"/>
+  <circle cx="220" cy="256" r="180" fill="url(#moonGlow)"/>
+  <circle cx="356" cy="256" r="145" fill="url(#ethGlow)"/>
 
-  <!-- crescent moon -->
-  <rect width="512" height="512" fill="url(#moon)" mask="url(#crescent)"/>
+  <!-- The half moon: the Monero coin recoloured into moon tones, then lit by the
+       phase mask. Its disc is the moon's face and its M is the lunar marking. -->
+  <g mask="url(#phase)">
+    <g transform="translate(60.04 84) scale(21.5)">
+      <path d="M16.3703 7.99946C16.3703 12.4172 12.7894 15.9986 8.37139 15.9986C3.9534 15.9986 0.372437 12.4172 0.372437 7.99946C0.372437 3.58176 3.95348 0.000244141 8.37139 0.000244141C12.7893 0.000244141 16.3703 3.58142 16.3703 7.99946Z" fill="url(#moneroM)"/>
+      <path d="M8.37067 0.000244141C3.95425 0.000244141 0.366943 3.58683 0.372565 7.9992C0.373673 8.88198 0.514442 9.73116 0.778646 10.5255H3.17186V3.79634L8.37067 8.99511L13.5692 3.79634V10.5256H15.9629C16.2275 9.73133 16.3676 8.88215 16.3692 7.99933C16.3767 3.58235 12.7876 0.00130896 8.37067 0.00130896V0.000244141Z" fill="url(#discUpper)"/>
+      <path d="M7.17401 10.1902L4.90522 7.92139V12.1556H3.17062L1.53381 12.1559C2.93781 14.4593 5.47515 16 8.3696 16C11.264 16 13.8015 14.4589 15.2058 12.1556H11.8335V7.92139L9.56454 10.1902L8.36934 11.3854L7.1741 10.1902H7.17401Z" fill="url(#discLower)"/>
+    </g>
+  </g>
 
-  <!-- ethereum mark, nestled in the crescent's hollow -->
-  <g transform="translate(268.01 138.50) scale(0.51570)">
+  <!-- Ethereum on the unlit side, in the space the shadow opened up. -->
+  <g transform="translate(291.55 151) scale(0.50371)">
     <path d="M127.9611 0.0369453L125.1661 9.5V285.168L127.9611 287.958L255.9231 212.32L127.9611 0.0369453Z" fill="url(#ethTop)" opacity="0.74"/>
     <path d="M127.962 0.0369453L0 212.32L127.962 287.958V154.158V0.0369453Z" fill="url(#ethTop)"/>
     <path d="M127.9611 312.1866L126.3861 314.1066V412.3056L127.9611 416.9066L255.9991 236.5866L127.9611 312.1866Z" fill="url(#ethBot)" opacity="0.74"/>
