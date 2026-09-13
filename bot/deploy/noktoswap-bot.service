@@ -1,0 +1,58 @@
+# The market maker, as a service.
+#
+#   sudo cp deploy/noktoswap-bot.service /etc/systemd/system/
+#   sudo systemctl enable --now noktoswap-bot
+#   journalctl -fu noktoswap-bot
+#
+# Start it WITHOUT --live and read the journal first. A dry run still simulates
+# every write against the real contract, so the log tells you exactly what it
+# would have done before a single transaction exists.
+
+[Unit]
+Description=NoktoSwap market-making bot
+After=network-online.target monero-wallet-rpc.service
+Wants=network-online.target
+# Not Requires: the bot is useful EVM-side while the wallet is resyncing, and it
+# refuses the operations that need a wallet rather than guessing at them.
+After=monero-wallet-rpc.service
+
+[Service]
+Type=simple
+User=noktoswap
+Group=noktoswap
+WorkingDirectory=/opt/noktoswap/bot
+
+# The private key lives here, not in this unit file. Unit files are world-readable
+# by default; this one is chmod 600 and owned by the service user.
+#
+#   BOT_PRIVATE_KEY=0x…
+#   MONERO_WALLET_RPC=http://127.0.0.1:18082
+#   MONERO_RPC_USER=…
+#   MONERO_RPC_PASSWORD=…
+#   BOT_RPC_1=https://…        # your own mainnet endpoint
+EnvironmentFile=/etc/noktoswap/bot.env
+
+# Caps are deliberately spelled out here rather than defaulted, so changing the
+# risk means editing a file someone has to look at. Start small.
+ExecStart=/usr/bin/pnpm bot run \
+  --live \
+  --max-offer-eth 0.01 \
+  --max-total-eth 0.05 \
+  --spread 0.02 \
+  --depth 2 \
+  --interval 60 \
+  --payout 4…YOUR_MONERO_PAYOUT_ADDRESS
+
+Restart=always
+RestartSec=30
+
+# The keystore is the only state, and losing it loses in-flight trades.
+# Back up /opt/noktoswap/bot/.noktoswap-bot with the same care as a seed phrase.
+ReadWritePaths=/opt/noktoswap/bot
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

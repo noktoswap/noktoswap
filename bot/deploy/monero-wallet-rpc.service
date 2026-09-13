@@ -1,0 +1,47 @@
+# monero-wallet-rpc, bound to localhost only.
+#
+# The bot runs on the same host, so the RPC never needs a public port — which is
+# the main reason to co-locate them. A wallet daemon holding spendable funds on a
+# reachable port is the single worst piece of this stack to get wrong.
+#
+#   sudo cp deploy/monero-wallet-rpc.service /etc/systemd/system/
+#   sudo systemctl enable --now monero-wallet-rpc
+
+[Unit]
+Description=Monero wallet RPC
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=monero
+Group=monero
+
+# --rpc-bind-ip 127.0.0.1 is the important flag. Digest auth is still on, because
+# anything else on the box can reach localhost too.
+#
+# --daemon-address points at a remote node so this host does not carry the chain.
+# That node learns which outputs you ask about, which is a real privacy cost for a
+# funding wallet; run your own monerod if that matters.
+ExecStart=/usr/bin/monero-wallet-rpc \
+  --wallet-file /var/lib/monero/bot-wallet \
+  --password-file /etc/noktoswap/wallet-password \
+  --rpc-bind-ip 127.0.0.1 \
+  --rpc-bind-port 18082 \
+  --rpc-login %i \
+  --daemon-address node.monerodevs.org:18089 \
+  --trusted-daemon \
+  --log-file /var/log/monero/wallet-rpc.log
+
+Restart=always
+RestartSec=10
+
+# The wallet file and its password are the only things here worth stealing.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/monero /var/log/monero
+
+[Install]
+WantedBy=multi-user.target

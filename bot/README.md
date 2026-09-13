@@ -102,6 +102,64 @@ chmods `0600`/`0700`. `pnpm bot backup` prints every phrase for writing down.
 public key it has ever seen and reverts on a repeat, so reusing a pair does not
 merely weaken the escrow — the transaction fails.
 
+## Deploying
+
+### On a VPS, next to monero-wallet-rpc — the simple answer
+
+If the wallet daemon is on a box, put the bot on the same box. Everything it was
+built for then works as built: the long-running `run` loop, the filesystem
+keystore, and — the part that actually matters — `monero-wallet-rpc` bound to
+`127.0.0.1` with no public port and no tunnel. A wallet daemon holding spendable
+funds on a reachable port is the worst thing in this stack to get wrong, and
+co-locating removes the question.
+
+`deploy/` has both systemd units. Two details in them are deliberate:
+
+The private key is in an `EnvironmentFile`, not the unit. Unit files are
+world-readable by default; `/etc/noktoswap/bot.env` is `chmod 600`.
+
+The bot is `After=` but not `Requires=` the wallet service. It is useful EVM-side
+while the wallet resyncs, and it refuses the operations that need one rather than
+guessing at them.
+
+Start it **without** `--live` and read `journalctl -fu noktoswap-bot` first. A dry
+run still simulates every write against the real contract, so the log says exactly
+what it would have done before any transaction exists.
+
+### On Cloudflare — the EVM half only
+
+Workers cannot run `monero-wallet-rpc`: it is a native binary and Workers are V8
+isolates. There is no filesystem either, so the keystore would move to KV or D1 and
+the `run` loop to a Cron Trigger.
+
+What makes this more interesting than it sounds is that the two Monero operations
+are not equally hard to do without a daemon:
+
+| Operation | Needs a wallet daemon? |
+|---|---|
+| `watch` — verify the escrow deposit before `ready()` | **No.** View-key scanning over blocks from any node. `monero-rs` supports exactly this: "transaction owned output detection and amount recovery with view keypair". |
+| `send` / `sweep` | **Yes.** Ring signatures and bulletproofs; no Rust crate in that ecosystem constructs them. |
+
+`watch` is the only *time-critical* one, because `ready()` must land before `t0`.
+`sweep` is not time-critical at all: once `claim` puts the other half on chain the
+escrow stays spendable indefinitely, and `bot escrow <id>` prints the address and
+combined keys to import anywhere.
+
+So an **EVM-side-only** bot could run entirely on Workers with no Monero daemon
+anywhere. A two-sided maker cannot — the spending half needs a wallet.
+
+A cheaper route than writing output scanning is a **light wallet server**, whose
+whole job is view-key scanning and which a Worker can simply `fetch`. Handing a view
+key to a third party is normally unacceptable, but the escrow's view key is
+**already published on chain in the clear** by the protocol, precisely so the EVM
+side can watch it — so scanning that one address through someone else's service
+leaks nothing that was not already public. That asymmetry exists only for escrow
+addresses, not for the bot's own funding wallet.
+
+Note `monero-rpc-rs` does not change any of this. It is an RPC client for
+`monerod` and `monero-wallet-rpc` with no wallet logic of its own — the same
+architectural position as `walletRpc.ts` here, in a different language.
+
 ## The Monero side
 
 `--monero-rpc http://127.0.0.1:18082` attaches a `monero-wallet-rpc`. Without it the
