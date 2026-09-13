@@ -1,11 +1,11 @@
-# XMRP2P contract review
+# NoktoSwap contract review
 
 Source reviewed: [`v3xlabs/xmrp2p`](https://github.com/v3xlabs/xmrp2p) at `4f74bd4`
 ("Deploy v1.1 to mainnet"), the version live at
 `0xad6871d44804288ba4393464c63544d6691d76ba`.
 
-Every finding below has a test in `test/XMRP2PBugs.t.sol` that fails against the
-original contract and passes against the fixed one. `test/XMRP2PFlows.t.sol`
+Every finding below has a test in `test/NoktoSwapBugs.t.sol` that fails against the
+original contract and passes against the fixed one. `test/NoktoSwapFlows.t.sol`
 covers the reworked payout path, the new key validation, and both trade
 directions end to end.
 

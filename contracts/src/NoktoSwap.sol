@@ -13,7 +13,7 @@ import "./Errors.sol";
 import "./Enums.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 
-contract XMRP2P is Ownable {
+contract NoktoSwap is Ownable {
     struct Offer {
         uint256 id;
         OfferType kind;

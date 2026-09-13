@@ -103,3 +103,18 @@ happened at that log.
 `sum(PayoutCredit) - sum(AccountWithdrawal)` is exact. Same for
 `MarketParameters`: `ParametersUpdated` fires from `_setParameters`, so
 construction is covered and the full parameter history is reconstructible.
+
+### Why the data source is still called `XMRP2P`
+
+The contract is `NoktoSwap` now, but the data source name in `subgraph.yaml`, the
+keys in `networks.json` and the ABI filename are deliberately unchanged.
+
+That name is baked into all three *deployed* subgraphs, and Studio's subgraph
+limit is reached, so they cannot be redeployed under a new one. Renaming here
+would make this repo describe something that is not what is indexing — and the
+deployed subgraphs are what the client actually reads. Keeping the label costs a
+moment of confusion; changing it would cost the ability to reason about live data
+from this file.
+
+The regenerate command does target the new contract name, because
+`forge inspect XMRP2P` no longer resolves to anything.

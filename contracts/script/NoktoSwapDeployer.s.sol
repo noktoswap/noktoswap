@@ -5,9 +5,9 @@ import {console} from "forge-std/Test.sol";
 import {Script} from "forge-std/Script.sol";
 import {Ed25519} from "../src/Ed25519.sol";
 import {OfferType} from "../src/Enums.sol";
-import {XMRP2P} from "../src/XMRP2P.sol";
+import {NoktoSwap} from "../src/NoktoSwap.sol";
 
-contract XMRP2PDeployer is Script {
+contract NoktoSwapDeployer is Script {
     address constant OWNER = 0x225f137127d9067788314bc7fcc1f36746a3c3B5;
     bytes32 constant SALT = bytes32(0);
     uint256 constant VALUE = 0;
@@ -18,13 +18,13 @@ contract XMRP2PDeployer is Script {
 
     function run() public {
         // Defaults to OWNER so mainnet behaviour is unchanged; testnet deploys
-        // set XMRP2P_OWNER so owner-only functions are reachable.
-        address owner = vm.envOr("XMRP2P_OWNER", OWNER);
+        // set NOKTOSWAP_OWNER so owner-only functions are reachable.
+        address owner = vm.envOr("NOKTOSWAP_OWNER", OWNER);
 
         vm.startBroadcast();
 
-        XMRP2P xmrp2p = new XMRP2P{value: VALUE}(
-            XMRP2P.Parameters({
+        NoktoSwap xmrp2p = new NoktoSwap{value: VALUE}(
+            NoktoSwap.Parameters({
                 MINIMUM_OFFER: 0.00001 ether,
                 MAXIMUM_OFFER: 10 ether,
                 DEPOSIT_RATIO: 500, // 1000 = 10%, 500 = 5%
@@ -44,7 +44,7 @@ contract XMRP2PDeployer is Script {
         // (uint256 viewX, uint256 viewY) = Ed25519.scalarMultBase(Ed25519.changeEndianness(SAMPLE_EVM_PRIVATE_VIEW_KEY));
         // uint256 samplePublicViewKey = Ed25519.changeEndianness(Ed25519.compressPoint(viewX, viewY));
 
-        // XMRP2P.Offer memory sampleOffer = xmrp2p.offer{value: SAMPLE_BUY_ORDER_AMOUNT}(
+        // NoktoSwap.Offer memory sampleOffer = xmrp2p.offer{value: SAMPLE_BUY_ORDER_AMOUNT}(
         //     OfferType.BUY, SAMPLE_PRICE, address(0), samplePublicSpendKey, samplePublicViewKey
         // );
         // console.log("Sample offer id: ", sampleOffer.id);

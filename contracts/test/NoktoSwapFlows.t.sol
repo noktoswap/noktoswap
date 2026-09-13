@@ -2,7 +2,7 @@
 pragma solidity ^0.8.34;
 
 import {Test} from "forge-std/Test.sol";
-import {XMRP2P} from "../src/XMRP2P.sol";
+import {NoktoSwap} from "../src/NoktoSwap.sol";
 import {Ed25519} from "../src/Ed25519.sol";
 import {OfferType, OfferState} from "../src/Enums.sol";
 import "../src/Errors.sol";
@@ -10,10 +10,10 @@ import "../src/Errors.sol";
 /// Refuses ETH until `open` is flipped, modelling a counterparty that is
 /// unreachable at payout time but can collect later.
 contract PickyReceiver {
-    XMRP2P public immutable market;
+    NoktoSwap public immutable market;
     bool public open;
 
-    constructor(XMRP2P _market) {
+    constructor(NoktoSwap _market) {
         market = _market;
     }
 
@@ -34,19 +34,19 @@ contract PickyReceiver {
     }
 }
 
-contract XMRP2PFlowsTest is Test {
+contract NoktoSwapFlowsTest is Test {
     uint256 constant L = 2 ** 252 + 27742317777372353535851937790883648493;
     uint256 constant Q = 2 ** 255 - 19;
 
-    XMRP2P market;
+    NoktoSwap market;
     address alice = address(0xA11CE);
     address bob = address(0xB0B);
     address owner = address(0x0FF1CE);
     uint256 keyNonce;
 
     function setUp() public {
-        market = new XMRP2P(
-            XMRP2P.Parameters({
+        market = new NoktoSwap(
+            NoktoSwap.Parameters({
                 MINIMUM_OFFER: 0.00001 ether,
                 MAXIMUM_OFFER: 10 ether,
                 DEPOSIT_RATIO: 500,
@@ -94,7 +94,7 @@ contract XMRP2PFlowsTest is Test {
 
         // Alice exits before t0; the hostile counterparty cannot stop her.
         vm.expectEmit(true, false, false, true, address(market));
-        emit XMRP2P.PayoutCredited(address(picky), 0.05 ether);
+        emit NoktoSwap.PayoutCredited(address(picky), 0.05 ether);
         vm.prank(alice);
         market.quit(offerId, evmSpendPriv, evmViewPriv);
 
@@ -105,7 +105,7 @@ contract XMRP2PFlowsTest is Test {
         picky.setOpen(true);
         uint256 before = address(picky).balance;
         vm.expectEmit(true, false, false, true, address(market));
-        emit XMRP2P.Withdrawal(address(picky), 0.05 ether);
+        emit NoktoSwap.Withdrawal(address(picky), 0.05 ether);
         picky.withdraw();
         assertEq(address(picky).balance - before, 0.05 ether, "credit not collectable");
         assertEq(market.withdrawable(address(picky)), 0, "credit not cleared");
@@ -153,7 +153,7 @@ contract XMRP2PFlowsTest is Test {
         uint256 offerId =
             market.openOffer{value: 0.05 ether}(OfferType.SELL, 1e12, address(0), xmrSpendPub, xmrViewPriv).id;
 
-        XMRP2P.Offer[] memory listed = market.listOffers(offerId, 1, false);
+        NoktoSwap.Offer[] memory listed = market.listOffers(offerId, 1, false);
         assertEq(listed[0].amount, 1 ether, "sell amount derived from deposit ratio");
 
         (, uint256 evmSpendPub) = newKey();

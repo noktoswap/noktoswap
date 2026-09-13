@@ -12,11 +12,11 @@ for what was wrong and why; every finding has a regression test.
 
 | Path | |
 |---|---|
-| `src/XMRP2P.sol` | the market: offers, escrow, deadlines, payouts |
+| `src/NoktoSwap.sol` | the market: offers, escrow, deadlines, payouts |
 | `src/Ed25519.sol` | on-chain ed25519 base-point multiplication and point validation |
 | `src/Enums.sol`, `src/Errors.sol` | offer types/states and the error set |
-| `test/XMRP2PBugs.t.sol` | one test per audit finding — each fails against upstream |
-| `test/XMRP2PFlows.t.sol` | payout credits, key validation, both trade directions |
+| `test/NoktoSwapBugs.t.sol` | one test per audit finding — each fails against upstream |
+| `test/NoktoSwapFlows.t.sol` | payout credits, key validation, both trade directions |
 
 ## Usage
 
@@ -26,13 +26,13 @@ forge test
 forge fmt
 ```
 
-`via_ir` is on: `XMRP2P.openOffer` returns a full `Offer` struct and does not fit
+`via_ir` is on: `NoktoSwap.openOffer` returns a full `Offer` struct and does not fit
 in the stack otherwise.
 
 ## Deploying
 
 ```shell
-forge script script/XMRP2PDeployer.s.sol:XMRP2PDeployer \
+forge script script/NoktoSwapDeployer.s.sol:NoktoSwapDeployer \
   --rpc-url <rpc> --broadcast --verify
 ```
 
@@ -42,7 +42,7 @@ audit.
 
 ## Deploying to the same address on every chain
 
-`XMRP2PCreate3.s.sol` deploys through [CreateX](https://github.com/pcaversaccio/createx)'s
+`NoktoSwapCreate3.s.sol` deploys through [CreateX](https://github.com/pcaversaccio/createx)'s
 CREATE3, which derives the address from `(deployer, salt)` and never from the
 initcode. Constructor arguments may therefore differ per chain while the address
 stays fixed. CreateX is already deployed at `0xba5Ed0…ba5Ed` on every chain here,
@@ -50,14 +50,14 @@ so there is nothing to bootstrap.
 
 ```shell
 # read-only; needs no key. Run per chain and check the addresses match.
-XMRP2P_DEPLOYER=0x… forge script script/XMRP2PCreate3.s.sol:XMRP2PCreate3 \
+NOKTOSWAP_DEPLOYER=0x… forge script script/NoktoSwapCreate3.s.sol:NoktoSwapCreate3 \
   --sig 'predict()' --rpc-url base
 
-DEPLOYER_KEY=0x… forge script script/XMRP2PCreate3.s.sol:XMRP2PCreate3 \
+DEPLOYER_KEY=0x… forge script script/NoktoSwapCreate3.s.sol:NoktoSwapCreate3 \
   --rpc-url base --broadcast
 ```
 
-Owner defaults to the deployer. `XMRP2P_OWNER` overrides it, and ownership is
+Owner defaults to the deployer. `NOKTOSWAP_OWNER` overrides it, and ownership is
 rotatable afterwards — solady's `transferOwnership` is unmodified — so admin can
 move to a cold key without redeploying. The address is the permanent part.
 
@@ -92,6 +92,6 @@ Sepolia's runtime code differs from the CREATE3 set in its last 43 bytes only �
 the CBOR metadata trailer, which moved when a comment changed. The first 8,818
 bytes are identical.
 
-`XMRP2PDeployer.s.sol` remains for plain CREATE deploys. Note its `OWNER`
-constant is v3xlabs's, inherited from upstream, so it needs `XMRP2P_OWNER` set;
-`XMRP2PCreate3.s.sol` defaults to the deployer instead and has no such trap.
+`NoktoSwapDeployer.s.sol` remains for plain CREATE deploys. Note its `OWNER`
+constant is v3xlabs's, inherited from upstream, so it needs `NOKTOSWAP_OWNER` set;
+`NoktoSwapCreate3.s.sol` defaults to the deployer instead and has no such trap.

@@ -2,16 +2,16 @@
 pragma solidity ^0.8.34;
 
 import {Test, console, Vm} from "forge-std/Test.sol";
-import {XMRP2P} from "../src/XMRP2P.sol";
+import {NoktoSwap} from "../src/NoktoSwap.sol";
 import {Ed25519} from "../src/Ed25519.sol";
 import {OfferType, OfferState} from "../src/Enums.sol";
 import "../src/Errors.sol";
 
 /// Rejects every incoming ETH transfer.
 contract RejectsEth {
-    XMRP2P public immutable market;
+    NoktoSwap public immutable market;
 
-    constructor(XMRP2P _market) {
+    constructor(NoktoSwap _market) {
         market = _market;
     }
 
@@ -24,10 +24,10 @@ contract RejectsEth {
     }
 }
 
-contract XMRP2PBugsTest is Test {
+contract NoktoSwapBugsTest is Test {
     uint256 constant L = 2 ** 252 + 27742317777372353535851937790883648493;
 
-    XMRP2P market;
+    NoktoSwap market;
 
     address alice = address(0xA11CE); // EVM side
     address bob = address(0xB0B); // XMR side
@@ -36,13 +36,13 @@ contract XMRP2PBugsTest is Test {
     uint256 keyNonce;
 
     function setUp() public {
-        market = new XMRP2P(defaultParams(), owner);
+        market = new NoktoSwap(defaultParams(), owner);
         vm.deal(alice, 100 ether);
         vm.deal(bob, 100 ether);
     }
 
-    function defaultParams() internal pure returns (XMRP2P.Parameters memory) {
-        return XMRP2P.Parameters({
+    function defaultParams() internal pure returns (NoktoSwap.Parameters memory) {
+        return NoktoSwap.Parameters({
             MINIMUM_OFFER: 0.00001 ether,
             MAXIMUM_OFFER: 10 ether,
             DEPOSIT_RATIO: 500, // 5%
@@ -67,7 +67,7 @@ contract XMRP2PBugsTest is Test {
         (evmSpendPriv, spendPub) = newKey();
         (evmViewPriv, viewPub) = newKey();
         vm.prank(alice);
-        XMRP2P.Offer memory o = market.openOffer{value: amount}(OfferType.BUY, 1e12, address(0), spendPub, viewPub);
+        NoktoSwap.Offer memory o = market.openOffer{value: amount}(OfferType.BUY, 1e12, address(0), spendPub, viewPub);
         offerId = o.id;
     }
 
@@ -76,9 +76,9 @@ contract XMRP2PBugsTest is Test {
     //      contract permanently stops accepting offers.
     // ---------------------------------------------------------------
     function test_H1_bookCapIsLiveNotCumulative() public {
-        XMRP2P.Parameters memory p = defaultParams();
+        NoktoSwap.Parameters memory p = defaultParams();
         p.MAXIMUM_OFFER_BOOK_SIZE = 2;
-        XMRP2P m = new XMRP2P(p, owner);
+        NoktoSwap m = new NoktoSwap(p, owner);
         vm.deal(alice, 10 ether);
 
         uint256[] memory ids = new uint256[](2);
@@ -156,8 +156,8 @@ contract XMRP2PBugsTest is Test {
             if (i == 0) first = id;
         }
 
-        XMRP2P.Offer[] memory fwd = market.listOffers(first, 3, false);
-        XMRP2P.Offer[] memory rev = market.listOffers(first, 3, true);
+        NoktoSwap.Offer[] memory fwd = market.listOffers(first, 3, false);
+        NoktoSwap.Offer[] memory rev = market.listOffers(first, 3, true);
 
         for (uint256 i = 0; i < 3; i++) {
             assertEq(rev[i].id, fwd[2 - i].id, "reverse listing is not the mirror of forward");
@@ -206,18 +206,18 @@ contract XMRP2PBugsTest is Test {
     // L8 — parameter validation.
     // ---------------------------------------------------------------
     function test_L8_rejectsInvertedOfferBounds() public {
-        XMRP2P.Parameters memory p = defaultParams();
+        NoktoSwap.Parameters memory p = defaultParams();
         p.MINIMUM_OFFER = 5 ether;
         p.MAXIMUM_OFFER = 1 ether;
         vm.expectRevert();
-        new XMRP2P(p, owner);
+        new NoktoSwap(p, owner);
     }
 
     function test_L8_rejectsZeroMinimumOffer() public {
-        XMRP2P.Parameters memory p = defaultParams();
+        NoktoSwap.Parameters memory p = defaultParams();
         p.MINIMUM_OFFER = 0;
         vm.expectRevert();
-        new XMRP2P(p, owner);
+        new NoktoSwap(p, owner);
     }
 
     // ---------------------------------------------------------------

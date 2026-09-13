@@ -9,7 +9,7 @@
     "deploy": "graph deploy xmrp-2-p",
     "create-local": "graph create --node http://localhost:8020/ xmrp-2-p",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 xmrp-2-p",
-    "abi": "cd ../contracts && forge inspect XMRP2P abi --json > ../subgraph/abis/XMRP2P.json"
+    "abi": "cd ../contracts && forge inspect NoktoSwap abi --json > ../subgraph/abis/XMRP2P.json"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "^0.97.0",

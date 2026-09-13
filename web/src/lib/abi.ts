@@ -5,7 +5,7 @@
  * Generated from `contracts/out` via `subgraph/abis/XMRP2P.json`; regenerate
  * with `pnpm run abi` in `subgraph/` if the contract changes.
  */
-export const xmrp2pAbi = [
+export const noktoswapAbi = [
   {
     "type": "function",
     "name": "cancel",
@@ -74,7 +74,7 @@ export const xmrp2pAbi = [
       {
         "name": "",
         "type": "tuple[]",
-        "internalType": "struct XMRP2P.Offer[]",
+        "internalType": "struct NoktoSwap.Offer[]",
         "components": [
           {
             "name": "id",
@@ -332,7 +332,7 @@ export const xmrp2pAbi = [
       {
         "name": "offer",
         "type": "tuple",
-        "internalType": "struct XMRP2P.Offer",
+        "internalType": "struct NoktoSwap.Offer",
         "components": [
           {
             "name": "id",
@@ -603,7 +603,7 @@ export const xmrp2pAbi = [
         "name": "parameters",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct XMRP2P.Parameters",
+        "internalType": "struct NoktoSwap.Parameters",
         "components": [
           {
             "name": "MINIMUM_OFFER",

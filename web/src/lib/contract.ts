@@ -1,6 +1,6 @@
 import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from '@wagmi/core'
 import { toEventSelector, type Address, type Hex } from 'viem'
-import { xmrp2pAbi } from './abi'
+import { noktoswapAbi } from './abi'
 import { chainInfo } from './chains'
 import { OFFER_KIND, OFFER_STATE, type OfferKind, type OfferState } from './offers'
 import { config } from './wagmi'
@@ -78,7 +78,7 @@ const decodeOffer = (tuple: OffersTuple): OnchainOffer => ({
  */
 export const readOffer = async (chainId: number, offerId: bigint): Promise<OnchainOffer> => {
   const tuple = (await readContract(config, {
-    abi: xmrp2pAbi,
+    abi: noktoswapAbi,
     address: marketAddress(chainId),
     functionName: 'offers',
     args: [offerId],
@@ -98,7 +98,7 @@ export type MarketParams = {
 
 export const readParameters = async (chainId: number): Promise<MarketParams> => {
   const tuple = (await readContract(config, {
-    abi: xmrp2pAbi,
+    abi: noktoswapAbi,
     address: marketAddress(chainId),
     functionName: 'parameters',
     chainId,
@@ -151,7 +151,7 @@ const send = async (
   value?: bigint,
 ): Promise<Hex> => {
   const request = {
-    abi: xmrp2pAbi,
+    abi: noktoswapAbi,
     address: marketAddress(chainId),
     functionName,
     args,
