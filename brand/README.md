@@ -7,6 +7,9 @@ All three are 512×512, `viewBox="0 0 512 512"`.
 | `noktoswap-logo.svg` | primary — night tile, rounded square. App icon, favicon, social avatar |
 | `noktoswap-mark.svg` | transparent, moon tones. **Dark backgrounds only** — it disappears on white |
 | `noktoswap-mark-light.svg` | transparent, ink. Light backgrounds, print, documents |
+| `noktoswap-cover.svg` | 16:9 cover — source |
+| `noktoswap-cover.png` | 1600×900, for submission forms |
+| `noktoswap-cover-640.png` | 640×360 |
 
 ## The idea
 
@@ -38,10 +41,17 @@ public one, and the trade is the boundary between them.
 Both source marks keep their canonical geometry; only the fills are restated.
 The Monero logo is CC0.
 
-## Regenerating a preview
+## Rendering
 
-No rasteriser needed — macOS QuickLook will do it:
+`qlmanage -t -s 512 -o . noktoswap-logo.svg` is enough for a square mark, but it
+forces a **square** thumbnail and will silently crop the 16:9 cover. For anything
+non-square use a real rasteriser:
 
 ```shell
-qlmanage -t -s 512 -o . noktoswap-logo.svg
+npm i sharp
+node -e "require('sharp')('noktoswap-cover.svg',{density:200})
+  .resize(1600,900).png().toFile('noktoswap-cover.png')"
 ```
+
+The cover embeds the mark by transforming the contents of `noktoswap-mark.svg`,
+so the two cannot drift — regenerate the cover after any change to the mark.
