@@ -285,26 +285,44 @@ describe('the currency picker', () => {
     expect(screen.getByText('Popular')).toBeInTheDocument()
   })
 
-  it('tells a missing contract apart from a missing indexer', () => {
+  it('groups mainnets apart from testnets', () => {
     mount(() => <ChainPicker target="token-networks" />)
     // "All chains" is a checkbox, not a button — it is a filter state.
     expect(screen.getByRole('checkbox', { name: 'All chains' })).toBeInTheDocument()
-    expect(screen.getByText('Sepolia')).toBeInTheDocument()
 
     /*
-     * Every chain the picker now offers has a contract — Arbitrum and Optimism
-     * were placeholders with `deployment: null` and are gone, so the "not
-     * deployed" row has no live case left. The distinction it drew still matters
-     * and is still drawn: Base Sepolia has a contract and no subgraph, and says
-     * "book not indexed" rather than reporting "0 open", which would be a claim
-     * about the market rather than about our coverage.
+     * The realms are not interchangeable and the flat list read as though they
+     * were: Sepolia sat among mainnets, one row of play money, distinguished only
+     * by a name you had to recognise. The books never merge, so the headings are
+     * what make that legible before anyone reads a price.
+     */
+    expect(screen.getByText('Mainnets')).toBeInTheDocument()
+    expect(screen.getByText('Testnets')).toBeInTheDocument()
+
+    for (const name of ['Ethereum', 'Base', 'Sepolia']) {
+      expect(screen.getByRole('checkbox', { name })).toBeInTheDocument()
+    }
+  })
+
+  it('never reports a count for coverage it does not have', () => {
+    mount(() => <ChainPicker target="token-networks" />)
+
+    /*
+     * Every chain now offered has both a contract and a subgraph, so neither
+     * caveat row has a live case: Arbitrum and Optimism were placeholders with no
+     * deployment and are gone, and Base Sepolia was deployed-but-unindexed until
+     * Studio's subgraph limit made it unshippable.
      *
-     * ChainPicker keeps its `absent` branch for a chain added before it is
-     * deployed; `isTradable` covers that logic directly in domain.test.ts, which
-     * does not need such a chain to exist in the registry to test it.
+     * Both branches stay in ChainPicker, because the states they describe recur
+     * whenever a deployment and its indexer move at different speeds. What must
+     * never happen is the third option — printing "0 open" for a chain this app
+     * cannot see, which is a claim about the market rather than about coverage.
+     * `deployedButUnindexed` and `isTradable` cover that logic directly in
+     * domain.test.ts, which does not need such a chain to exist to test it.
      */
     expect(screen.queryByText('not deployed')).not.toBeInTheDocument()
-    expect(screen.getAllByText(/book not indexed/).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/book not indexed/)).not.toBeInTheDocument()
+    expect(screen.getAllByText(/\d+ open/).length).toBeGreaterThan(0)
 
     // With no wallet there is no balance to read, and an unread balance shows as
     // a dash rather than a zero that would read as a real figure.

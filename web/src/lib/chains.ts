@@ -1,18 +1,21 @@
-import { base, baseSepolia, mainnet, optimism, sepolia } from 'viem/chains'
+import { base, mainnet, optimism, sepolia } from 'viem/chains'
 import type { Address, Chain } from 'viem'
 
 /**
  * Where the protocol is, and where its book is — which are two different facts.
  *
- * `deployment` is whether a contract exists. `indexed` is whether this app can
- * *list* its offers. The subgraph covers Sepolia only, so mainnet, Base and Base
- * Sepolia have live contracts whose books are invisible from here.
+ * `deployment` is whether a contract exists. `subgraph` is whether this app can
+ * *list* its offers. Every chain offered right now has both, but they stay
+ * separate fields because they come apart the moment one moves ahead of the
+ * other — Base Sepolia sat here deployed and unindexed until Studio's subgraph
+ * limit made it unshippable, and mainnet and Base each spent a while in that
+ * state before their indexers went up.
  *
- * Collapsing those into one flag would make the chain picker report "0 open" on
- * mainnet, which is a claim about the market rather than about our coverage —
- * exactly the kind of confident wrong number this app avoids elsewhere. A chain
- * with no contract says "not deployed"; a deployed chain with no indexer says so
- * too, and neither invents a count.
+ * Collapsing them into one flag would make the picker report "0 open" for a chain
+ * it simply cannot see, which is a claim about the market rather than about our
+ * coverage — the kind of confident wrong number this app avoids elsewhere. So a
+ * chain with no contract says "not deployed", a deployed chain with no indexer
+ * says so too, and neither invents a count.
  */
 export type ChainInfo = {
   readonly chain: Chain
@@ -96,19 +99,6 @@ export const CHAINS: readonly ChainInfo[] = [
     uniswapRoutable: true,
     explorer: 'https://basescan.org',
     moneroMainnet: true,
-  },
-  {
-    chain: baseSepolia,
-    label: 'Base Sepolia',
-    deployment: CREATE3_ADDRESS,
-    deployedAtBlock: 46729575n,
-    // Deployed, but no subgraph — its book is not browsable from here.
-    subgraph: null,
-    // Testnet: no Token API coverage, and stagenet XMR.
-    tokenApiNetwork: null,
-    uniswapRoutable: true,
-    explorer: 'https://sepolia.basescan.org',
-    moneroMainnet: false,
   },
 ] as const
 

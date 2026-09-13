@@ -942,7 +942,7 @@ describe('the QR codes carry a real payload', () => {
     // constraint worth asserting.
     const view = combinePrivateKeys(pair.privateView, other.privateView)
     const spend = combinePrivateKeys(pair.privateSpend, other.privateSpend)
-    const uri = moneroWalletUri(address, spend, view, 'Noktoswap Sepolia #37')
+    const uri = moneroWalletUri(address, spend, view, 'NoktoSwap Sepolia #37')
 
     expect(uri.length).toBeGreaterThan(300)
     // Alphanumeric-mode QR tops out around 4296 characters; this is nowhere near,
@@ -956,7 +956,7 @@ describe('the QR codes carry a real payload', () => {
     // The whole reason the EVM side gets a view URI and not a wallet URI: it must
     // be able to verify the deposit without being able to take it.
     const view = combinePrivateKeys(pair.privateView, other.privateView)
-    const uri = moneroViewUri(address, view, 'Noktoswap Sepolia #37')
+    const uri = moneroViewUri(address, view, 'NoktoSwap Sepolia #37')
     expect(uri).toContain('view_key=')
     expect(uri).not.toContain('spend_key=')
   })
@@ -1150,10 +1150,16 @@ describe('an offer is identified by chain and id, never id alone', () => {
     expect(indexed).toContain(SEPOLIA)
     expect(indexed).toContain(MAINNET)
     expect(indexed).toContain(BASE)
-    expect(indexed).not.toContain(84532) // Base Sepolia: deployed, no subgraph
 
-    const gap = deployedButUnindexed().map((c) => c.chain.id)
-    expect(gap).toEqual([84532])
+    /*
+     * Every chain now offered is also indexed, so the gap is empty. Base Sepolia
+     * filled it until Studio's subgraph limit made it unshippable, and mainnet and
+     * Base each sat in it before their indexers went up — the two fields stay
+     * separate because they come apart whenever one moves ahead of the other, not
+     * because something is in the gap today.
+     */
+    expect(deployedButUnindexed()).toEqual([])
+    expect(indexedChains().length).toBe(CHAINS.length)
   })
 })
 
@@ -1204,17 +1210,28 @@ describe('a thin book does not get to set the rate', () => {
 describe('test money and real money are different markets', () => {
   it('never lets a testnet chain see a mainnet one, or the reverse', () => {
     // The bug: a wallet on Ethereum was shown the single Sepolia offer and its
-    // price. The design's "one book, not four" means Ethereum/Optimism/Arbitrum/
-    // Base — mainnets one wallet prompt apart. Sepolia is only here because it is
-    // where the contract landed first.
+    // price. "One book, not four" means mainnets one wallet prompt apart — here
+    // Ethereum and Base. Sepolia is only here because it is where the contract
+    // landed first.
     expect(realmOf(1)).toBe('mainnet')
     expect(realmOf(8453)).toBe('mainnet')
     expect(realmOf(11155111)).toBe('testnet')
-    expect(realmOf(84532)).toBe('testnet')
 
     expect(sameRealm(1, 8453)).toBe(true)
     expect(sameRealm(1, 11155111)).toBe(false)
-    expect(sameRealm(11155111, 84532)).toBe(true)
+
+    /*
+     * An unknown chain reads as mainnet, because `chainInfo` returns undefined and
+     * `?.chain.testnet` is falsy. Worth pinning rather than leaving implicit: it
+     * means a wallet on some chain this app has never heard of is treated as a
+     * mainnet reader. That is the right default — it cannot contribute offers
+     * either way, since only chains in CHAINS have a subgraph to read — but the
+     * safety argument runs the other direction, so anyone changing `realmOf`
+     * should have to change this line deliberately.
+     */
+    expect(realmOf(999999)).toBe('mainnet')
+    expect(realmOf(undefined)).toBe('mainnet')
+    expect(visibleChains(999999).every((c) => realmOf(c.chain.id) === 'mainnet')).toBe(true)
   })
 
   it('shows a mainnet reader only indexed mainnets', () => {
@@ -1237,7 +1254,6 @@ describe('test money and real money are different markets', () => {
     expect(chainInfo(1)?.moneroMainnet).toBe(true)
     expect(chainInfo(8453)?.moneroMainnet).toBe(true)
     expect(chainInfo(11155111)?.moneroMainnet).toBe(false)
-    expect(chainInfo(84532)?.moneroMainnet).toBe(false)
 
     for (const info of CHAINS) {
       // The pairing must hold for every chain, not just the ones checked above.

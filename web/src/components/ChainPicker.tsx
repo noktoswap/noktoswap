@@ -1,7 +1,7 @@
 import { Checkbox } from '@kobalte/core/checkbox'
 import { useQuery } from '@tanstack/solid-query'
 import { For, Show, type JSX } from 'solid-js'
-import { CHAINS } from '../lib/chains'
+import { CHAINS, realmOf } from '../lib/chains'
 import { formatEth, plural } from '../lib/format'
 import { fetchNativeAcrossChains } from '../lib/balances'
 import { useApp } from '../state/app'
@@ -129,6 +129,21 @@ export const ChainPicker = (props: { target: ChainFilterTarget }): JSX.Element =
     return app.openCount()
   }
 
+  /*
+   * Split by realm, because the realms are not interchangeable and the list read
+   * as though they were: Sepolia sat between mainnets, one row of play money
+   * among real ones, distinguished only by a name you had to recognise.
+   *
+   * The books never merge — `visibleChains` filters by realm — so a selection
+   * spanning both groups cannot show a single combined book, and the heading is
+   * what makes that legible before someone reads a price. Derived from `realmOf`
+   * rather than `chain.testnet` so there is one definition of which is which.
+   */
+  const GROUPS = [
+    { label: 'Mainnets', first: true, chains: () => CHAINS.filter((c) => realmOf(c.chain.id) === 'mainnet') },
+    { label: 'Testnets', first: false, chains: () => CHAINS.filter((c) => realmOf(c.chain.id) === 'testnet') },
+  ]
+
   return (
     <Modal title="Chains" width={422}>
       {/*
@@ -145,7 +160,16 @@ export const ChainPicker = (props: { target: ChainFilterTarget }): JSX.Element =
       </div>
 
       <div style={{ display: 'flex', 'flex-direction': 'column' }}>
-        <For each={CHAINS}>
+        <For each={GROUPS}>
+          {(group) => (
+            <Show when={group.chains().length > 0}>
+              <span
+                class="th"
+                style={{ padding: '9px 2px 3px', 'border-top': group.first ? undefined : '1px solid var(--line)' }}
+              >
+                {group.label}
+              </span>
+              <For each={group.chains()}>
           {(info) => {
             const balance = () => balances.data?.get(info.chain.id) ?? null
             const book = () => bookOn(info)
@@ -183,13 +207,16 @@ export const ChainPicker = (props: { target: ChainFilterTarget }): JSX.Element =
               />
             )
           }}
+              </For>
+            </Show>
+          )}
         </For>
       </div>
 
       <span class="cap" style={{ 'padding-top': '4px' }}>
-        Offers live on the chain they were opened on. The contract is deployed at one address across
-        chains. Every chain here is routable by the Uniswap Trading API; UniswapX fills only on
-        Ethereum, Arbitrum and Base.
+        Offers live on the chain they were opened on, and the two groups never share a book — a
+        testnet offer is play money and is priced as such. The contract sits at one address across
+        chains; every chain here is routable by the Uniswap Trading API.
       </span>
 
       <button class="btn btn-primary" onClick={closeModal}>
