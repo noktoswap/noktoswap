@@ -291,10 +291,19 @@ describe('the currency picker', () => {
     expect(screen.getByRole('checkbox', { name: 'All chains' })).toBeInTheDocument()
     expect(screen.getByText('Sepolia')).toBeInTheDocument()
 
-    // Arbitrum and Optimism have no contract. Mainnet, Base and Base Sepolia do,
-    // and reporting "0 open" for them would be a claim about the market rather
-    // than about our coverage — so they say which it is.
-    expect(screen.getAllByText('not deployed').length).toBe(2)
+    /*
+     * Every chain the picker now offers has a contract — Arbitrum and Optimism
+     * were placeholders with `deployment: null` and are gone, so the "not
+     * deployed" row has no live case left. The distinction it drew still matters
+     * and is still drawn: Base Sepolia has a contract and no subgraph, and says
+     * "book not indexed" rather than reporting "0 open", which would be a claim
+     * about the market rather than about our coverage.
+     *
+     * ChainPicker keeps its `absent` branch for a chain added before it is
+     * deployed; `isTradable` covers that logic directly in domain.test.ts, which
+     * does not need such a chain to exist in the registry to test it.
+     */
+    expect(screen.queryByText('not deployed')).not.toBeInTheDocument()
     expect(screen.getAllByText(/book not indexed/).length).toBeGreaterThan(0)
 
     // With no wallet there is no balance to read, and an unread balance shows as
@@ -317,9 +326,9 @@ describe('the currency picker', () => {
     // inert: `selected` was snapshotted into the modal payload, so nothing the
     // user clicked could ever change what was rendered.
     toggleTokenNetwork(8453)
-    toggleTokenNetwork(42161)
+    toggleTokenNetwork(1)
     await Promise.resolve()
-    expect(tokenNetworks()).toEqual([8453, 42161])
+    expect(tokenNetworks()).toEqual([8453, 1])
     const after = screen.getAllByRole('checkbox') as HTMLInputElement[]
     expect(after.filter((b) => b.checked).length).toBe(2)
     // And "All chains" is unticked precisely because something else is.

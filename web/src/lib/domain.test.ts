@@ -22,9 +22,12 @@ import {
   proves,
 } from './keys'
 import { permitTypedData, type PermitData } from './uniswap'
+import { config } from './wagmi'
 import {
   CHAINS,
+  READ_ONLY_CHAINS,
   chainInfo,
+  chainLabel,
   deployedButUnindexed,
   indexedChains,
   isTradable,
@@ -1131,7 +1134,17 @@ describe('an offer is identified by chain and id, never id alone', () => {
     // no subgraph, so it can be traded by id but not browsed.
     expect(isTradable(SEPOLIA)).toBe(true)
     expect(isTradable(MAINNET)).toBe(true)
-    expect(isTradable(42161)).toBe(false) // Arbitrum: claimable, not deployed
+    // Arbitrum is no longer in the registry at all, so this now tests the
+    // unknown-chain path rather than the known-but-undeployed one. Both must
+    // answer false, and a wallet sitting on an unoffered chain is the likelier
+    // case of the two.
+    expect(isTradable(42161)).toBe(false)
+    expect(isTradable(undefined)).toBe(false)
+    // The modelled state itself, without needing an undeployed chain to exist:
+    // `deployment: null` is what makes a chain untradable, and ChainPicker's
+    // "not deployed" row still reads from exactly this.
+    expect(CHAINS.every((c) => c.deployment !== null)).toBe(true)
+    expect(CHAINS.filter((c) => c.deployment === null)).toEqual([])
 
     const indexed = indexedChains().map((c) => c.chain.id)
     expect(indexed).toContain(SEPOLIA)
@@ -1385,5 +1398,33 @@ describe('the Permit2 payload is reshaped, not passed through', () => {
       values: {},
     }
     expect(() => permitTypedData(twoRoots)).toThrow(/cannot tell which type to sign/)
+  })
+})
+
+describe('a chain can be readable without being offerable', () => {
+  it('keeps Optimism reachable but unlisted', () => {
+    // The registry offers it to nobody...
+    expect(CHAINS.map((c) => c.chain.id)).not.toContain(10)
+    expect(chainInfo(10)).toBeUndefined()
+    // ...and says so honestly rather than inventing a label.
+    expect(chainLabel(10)).toBe('Chain 10')
+    expect(isTradable(10)).toBe(false)
+
+    /*
+     * ...but wagmi must still hold a transport for it, because Chainlink's
+     * mainnet XMR/USD proxy is decommissioned and `lib/oracle.ts` reads the
+     * Optimism pair instead. Removing it from the config typechecks and builds
+     * fine and then throws at runtime on the rate ladder's last rung, which is
+     * the failure this guards.
+     */
+    expect(READ_ONLY_CHAINS.map((c) => c.id)).toContain(10)
+    expect(config.chains.map((c) => c.id)).toContain(10)
+  })
+
+  it('offers every chain it can trade on', () => {
+    // The converse: nothing offerable may be missing a transport.
+    for (const info of CHAINS) {
+      expect(config.chains.map((c) => c.id)).toContain(info.chain.id)
+    }
   })
 })

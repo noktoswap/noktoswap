@@ -4,7 +4,8 @@ import { coinbaseWallet } from '@wagmi/solid/connectors/coinbaseWallet'
 import { metaMask } from '@wagmi/solid/connectors/metaMask'
 import { safe } from '@wagmi/solid/connectors/safe'
 import type { CreateConnectorFn, Transport } from '@wagmi/core'
-import { CHAINS } from './chains'
+import type { Chain } from 'viem'
+import { CHAINS, READ_ONLY_CHAINS } from './chains'
 
 /**
  * `@wagmi/solid` — the official Solid package, not the community `solid-wagmi`.
@@ -15,10 +16,13 @@ import { CHAINS } from './chains'
  * rather than an id, and the connector list hung off `useDisconnect` instead of
  * having a `useConnectors` of its own.
  */
-const chains = CHAINS.map((c) => c.chain) as [
-  (typeof CHAINS)[number]['chain'],
-  ...(typeof CHAINS)[number]['chain'][],
-]
+/*
+ * Offerable chains plus read-only ones. The second group exists entirely so
+ * `readContract` has a transport for them — Chainlink's live XMR/USD pair is on
+ * Optimism, where nothing is deployed. Omitting them builds and typechecks fine
+ * and fails at runtime, on the fallback rung of the rate ladder.
+ */
+const chains = [...CHAINS.map((c) => c.chain), ...READ_ONLY_CHAINS] as [Chain, ...Chain[]]
 
 /**
  * One RPC override per chain, via `VITE_RPC_<chainId>`. Unset falls back to the

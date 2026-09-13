@@ -120,15 +120,15 @@ without taking an address at all. What it *does* give, which the Token API canno
 is the routable token list on Sepolia, and `/swappable_tokens` is used for exactly
 that.
 
-**So the figures come from the chain.** Multicall3 sits at the same address on all
-five configured chains, Sepolia included, and the token list is deliberately
+**So the figures come from the chain.** Multicall3 sits at the same address on
+every configured chain, Sepolia included, and the token list is deliberately
 constrained — so "what do you hold, of these" is one RPC round trip with no key,
 no CORS, and no third party to be down. `lib/balances.ts`.
 
 | | Answers | Chains | Freshness |
 |---|---|---|---|
 | Token API | which tokens at all | mainnets | indexed, lags |
-| Multicall3 | how much, exactly | all five | head |
+| Multicall3 | how much, exactly | all offered | head |
 
 Both run in the picker, across every selected network, and the results merge with
 the on-chain figure winning on overlap — it is a direct read at head, so it cannot
@@ -634,7 +634,7 @@ contract reads and writes all take the pair — resolving a chain globally meant
 opening one chain's order and signing against another's.
 
 **Test money and real money are different markets.** The design's "one book, not
-four" means Ethereum/Optimism/Arbitrum/Base — mainnets one wallet prompt apart.
+four" means mainnets one wallet prompt apart — here Ethereum and Base.
 Sepolia is here because it is where the contract landed first, and merging it into
 a mainnet book put play money beside real money. Worse, the Monero network is
 paired to the chain, so a Sepolia offer carries a *stagenet* escrow address. The
