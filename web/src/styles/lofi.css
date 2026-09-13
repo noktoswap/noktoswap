@@ -30,6 +30,50 @@
   color-scheme: light;
 }
 
+/*
+ * Dark, in three parts, which is what it takes for a toggle and an OS preference
+ * to coexist.
+ *
+ * Only the nine colour tokens are redefined — every rule below reads them, so
+ * nothing else in this file knows a theme exists. `color-scheme` is set too, so
+ * form controls and scrollbars follow rather than staying stubbornly light.
+ *
+ * The media block is guarded: a reader on a dark OS who explicitly picks light
+ * must win, and `:root:not([data-theme='light'])` is what lets them. The
+ * attribute block then repeats the tokens so the toggle also works in the other
+ * direction, on a light OS. Unset means neither block with an attribute applies
+ * and the media query decides, which is the default.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+  --paper: #17171a;
+  --panel: #1f1f23;
+  --box: #27272c;
+  --box2: #313138;
+  --line: #45454e;
+  --line2: #6b6b77;
+  --ink: #e9e9ec;
+  --muted: #9a9aa6;
+  --scrim: #0a0a0c;
+
+  color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --paper: #17171a;
+  --panel: #1f1f23;
+  --box: #27272c;
+  --box2: #313138;
+  --line: #45454e;
+  --line2: #6b6b77;
+  --ink: #e9e9ec;
+  --muted: #9a9aa6;
+  --scrim: #0a0a0c;
+
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -511,8 +555,16 @@ svg {
 
 @media (max-width: 720px) {
   .page {
-    padding: 0 0 20px;
-    gap: 0;
+    /*
+     * Reduced, not removed. This was `0 0 20px`, on the theory that each section
+     * would ask for its own inset — and the widget and the results column never
+     * did, so at 393pt their cards ran into both screen edges with nothing between
+     * the text and the bezel. The gutter belongs to the page shell, in one place,
+     * and the sections that used to carry their own 16px had it taken away rather
+     * than left to double up.
+     */
+    padding: 10px 14px 20px;
+    gap: 10px;
   }
   /* the book's eight columns cannot survive 393pt — each offer becomes a card */
   .tgrid {

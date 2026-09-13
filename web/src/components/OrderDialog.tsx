@@ -334,7 +334,7 @@ export const OrderDialog = (props: { chainId: number; offerId: bigint }): JSX.El
 
   /** A label a wallet will show against the imported account. */
   const escrowLabel = () =>
-    `Noktoswap ${chainLabel(props.chainId)} #${props.offerId.toString()}`
+    `NoktoSwap ${chainLabel(props.chainId)} #${props.offerId.toString()}`
 
   const onchain = useQuery(() => ({
     queryKey: ['onchain-offer', props.chainId, props.offerId.toString()],

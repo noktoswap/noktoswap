@@ -97,7 +97,6 @@ export const Orders = (): JSX.Element => {
           display: 'flex',
           'flex-direction': 'column',
           gap: '14px',
-          padding: '0 16px',
         }}
       >
         <div style={{ display: 'flex', gap: '22px', 'align-items': 'flex-end', padding: '0 4px' }}>

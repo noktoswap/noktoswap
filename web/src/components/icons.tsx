@@ -90,18 +90,3 @@ export const XmrMark = (props: IconProps): JSX.Element => (
 /** Ether, for the amount boxes in the order dialog. */
 export const EthMark = lofi(DiamondIcon, 15)
 
-/** The wordmark. Drawn rather than borrowed — it is the one brand element. */
-export const Logo = (props: IconProps): JSX.Element => (
-  <svg
-    width={props.size ?? 40}
-    height={props.size ?? 40}
-    viewBox="0 0 40 40"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="1.5"
-    class={props.class}
-  >
-    <rect x="1" y="1" width="38" height="38" rx="8" />
-    <path d="M12 13 28 27M28 13 12 27" />
-  </svg>
-)

@@ -1,8 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/wrangler.json",
 
-  // Must match the existing Worker service, or a deploy creates a second one.
-  "name": "xmrp2p",
+  /*
+   * The URL is `<name>.<account-subdomain>.workers.dev`, and the account
+   * subdomain is `noktoswap`, so this reads app.noktoswap.workers.dev. Renaming
+   * it creates a new service rather than moving the old one — `xmrp2p` is the
+   * predecessor and can be deleted once auto-deploy is confirmed against this.
+   */
+  "name": "app",
 
   /*
    * Older than "today's date", on purpose. A compatibility date newer than the

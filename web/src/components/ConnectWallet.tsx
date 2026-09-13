@@ -174,7 +174,7 @@ export const ConnectWallet = (): JSX.Element => {
       </Show>
 
       <span class="cap" style={{ 'padding-top': '2px' }}>
-        Noktoswap never asks for a seed phrase or a private key. Connecting only shares your public
+        NoktoSwap never asks for a seed phrase or a private key. Connecting only shares your public
         address.
       </span>
     </Modal>

@@ -33,7 +33,7 @@ const transports = Object.fromEntries(
   chains.map((c) => [c.id, http(import.meta.env[`VITE_RPC_${c.id}`] as string | undefined)]),
 ) as Record<number, Transport>
 
-const APP_NAME = 'Noktoswap'
+const APP_NAME = 'NoktoSwap'
 
 const connectors: CreateConnectorFn[] = [
   // `injected` is kept alongside `metaMask` deliberately: it picks up whatever

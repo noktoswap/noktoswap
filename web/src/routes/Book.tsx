@@ -117,7 +117,7 @@ export const Book = (): JSX.Element => {
       <Nav />
       <WaitingOnYou compact />
 
-      <div style={{ display: 'flex', 'flex-direction': 'column', gap: '10px', padding: '0 16px' }}>
+      <div style={{ display: 'flex', 'flex-direction': 'column', gap: '10px' }}>
         {/* Same amount bar as the landing screen. */}
         <div
           class="card"

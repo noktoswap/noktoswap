@@ -105,7 +105,7 @@ export const WaitingOnYou = (props: { compact?: boolean }): JSX.Element => {
         tappable line carrying the count and the soonest deadline. Still
         impossible to miss; the cards themselves live on My orders.
       */}
-      <div class="phone-only" style={{ padding: '12px 16px 0' }}>
+      <div class="phone-only" style={{ padding: '4px 0 0' }}>
         <A href="/orders" style={{ 'text-decoration': 'none' }}>
           <div class="ord ord-live" style={{ gap: '9px' }}>
             <span

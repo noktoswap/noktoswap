@@ -5,8 +5,9 @@ import { CHAINS, chainInfo, chainLabel } from '../lib/chains'
 import { shortAddress } from '../lib/format'
 import { useApp } from '../state/app'
 import { openConnect } from '../state/modals'
+import { resolvedTheme, toggleTheme } from '../state/theme'
 import { ChainIcon } from './TokenIcon'
-import { Avatar, Chevron, Contrast, Logo } from './icons'
+import { Avatar, Chevron, Contrast } from './icons'
 
 /**
  * The navbar chain chip answers a different question from the one in the token
@@ -33,7 +34,9 @@ const ChainChip = (): JSX.Element => {
         >
           <ChainIcon chainId={app.walletChainId() as number} size={18} />
         </Show>
-        <span>{app.wrongNetwork() ? 'Wrong network' : chainLabel(app.walletChainId())}</span>
+        <span classList={{ 'desktop-only': !app.wrongNetwork() }}>
+          {app.wrongNetwork() ? 'Wrong network' : chainLabel(app.walletChainId())}
+        </span>
         <Chevron />
       </button>
 
@@ -147,13 +150,12 @@ export const Nav = (): JSX.Element => (
       href="/"
       style={{ display: 'flex', 'align-items': 'center', gap: '12px', 'text-decoration': 'none' }}
     >
-      <Logo />
       <span class="stack desktop-only" style={{ gap: '1px' }}>
-        <span style={{ 'font-size': '23px' }}>xmrp2p.eth</span>
+        <span style={{ 'font-size': '23px' }}>NoktoSwap</span>
         <span class="cap">Atomic Peer-to-Peer XMR/ETH Swaps</span>
       </span>
       <span class="phone-only" style={{ 'font-size': '17px' }}>
-        xmrp2p.eth
+        NoktoSwap
       </span>
     </A>
 
@@ -165,9 +167,15 @@ export const Nav = (): JSX.Element => (
         seeing are play money before they read anything into them.
       */}
       <RealmBadge />
-      <span class="chip" style={{ padding: '7px 9px' }} aria-hidden="true">
+      <button
+        class="chip"
+        style={{ padding: '7px 9px' }}
+        onClick={toggleTheme}
+        aria-label={`Switch to ${resolvedTheme() === 'dark' ? 'light' : 'dark'} theme`}
+        title={`Switch to ${resolvedTheme() === 'dark' ? 'light' : 'dark'} theme`}
+      >
         <Contrast />
-      </span>
+      </button>
       <ChainChip />
       <WalletChip />
     </div>
@@ -193,7 +201,7 @@ export const Footer = (props: { chainId: number }): JSX.Element => (
     }}
   >
     <a
-      href="https://github.com/v1rtl/xmrp2p"
+      href="https://github.com/noktoswap/noktoswap"
       target="_blank"
       rel="noreferrer"
       style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}
